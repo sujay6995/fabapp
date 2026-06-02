@@ -14,7 +14,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/tasks")
 @RequiredArgsConstructor
-@CrossOrigin
 public class WorkerTaskController {
 
     private final WorkerTaskService workerTaskService;

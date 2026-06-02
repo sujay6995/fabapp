@@ -14,7 +14,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/job-requests")
 @RequiredArgsConstructor
-@CrossOrigin
 public class JobRequestController {
 
     private final JobRequestService jobRequestService;

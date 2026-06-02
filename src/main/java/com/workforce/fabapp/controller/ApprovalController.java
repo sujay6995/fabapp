@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/approvals")
 @RequiredArgsConstructor
-@CrossOrigin
 public class ApprovalController {
 
     private final ApprovalService approvalService;

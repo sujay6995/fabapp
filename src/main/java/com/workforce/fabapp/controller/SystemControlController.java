@@ -19,7 +19,6 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/system")
 @RequiredArgsConstructor
-@CrossOrigin
 @PreAuthorize("hasRole('ADMIN')")
 public class SystemControlController {
 

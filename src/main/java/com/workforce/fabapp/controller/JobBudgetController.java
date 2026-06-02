@@ -14,7 +14,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/job-budgets")
 @RequiredArgsConstructor
-@CrossOrigin
 public class JobBudgetController {
 
     private final JobBudgetService jobBudgetService;

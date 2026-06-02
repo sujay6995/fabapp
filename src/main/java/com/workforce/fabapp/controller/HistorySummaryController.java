@@ -13,7 +13,6 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/history")
 @RequiredArgsConstructor
-@CrossOrigin
 @PreAuthorize("hasRole('ADMIN')")
 public class HistorySummaryController {
 

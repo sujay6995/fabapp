@@ -13,7 +13,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/supervisors")
 @RequiredArgsConstructor
-@CrossOrigin
 public class SupervisorController {
 
     private final SupervisorService supervisorService;

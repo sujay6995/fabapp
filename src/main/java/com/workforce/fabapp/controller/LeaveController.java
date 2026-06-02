@@ -12,7 +12,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/leave")
 @RequiredArgsConstructor
-@CrossOrigin
 public class LeaveController {
 
     private final LeaveRequestService leaveRequestService;

@@ -13,7 +13,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/double-time")
 @RequiredArgsConstructor
-@CrossOrigin
 @PreAuthorize("hasAnyRole('SUPERVISOR','ADMIN')")
 public class DoubleTimeAllocationController {
 

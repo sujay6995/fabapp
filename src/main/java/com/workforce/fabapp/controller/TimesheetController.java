@@ -19,7 +19,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/timesheets")
 @RequiredArgsConstructor
-@CrossOrigin
 public class TimesheetController {
 
     private final TimesheetService timesheetService;
