@@ -40,10 +40,10 @@ public class DataInitializer {
     @Bean
     public CommandLineRunner seedData() {
         return args -> {
-            ensureDepartment("Fab Shop");
-            ensureDepartment("Laddle Bay");
-            ensureDepartment("Shipping");
-            ensureDepartment("Office");
+            Department fabShop = ensureDepartment("Fab Shop");
+            Department ladleBay = ensureDepartment("Ladle Bay");
+            Department shipping = ensureDepartment("Shipping");
+            Department office = ensureDepartment("Office");
 
             Crew crewA = ensureCrew("Crew A");
             Crew crewB = ensureCrew("Crew B");
@@ -64,7 +64,118 @@ public class DataInitializer {
             ensureLeaveType("Personal");
             ensureLeaveType("Unpaid");
 
+            Supervisor sarahSupervisor = supervisorRepository.save(
+                    Supervisor.builder()
+                            .supervisorCode("SUP002")
+                            .name("Paul St Michel")
+                            .title("Production Supervisor")
+                            .active(true)
+                            .build()
+            );
+            Supervisor tonySupervisor = supervisorRepository.save(
+                    Supervisor.builder()
+                            .supervisorCode("SUP003")
+                            .name("Tony Marshall")
+                            .title("Production Manager")
+                            .active(true)
+                            .build()
+            );
 
+
+
+            // Employees
+            Employee riley = employeeRepository.save(
+                    Employee.builder()
+                            .employeeCode("EMP001")
+                            .name("Riley Gilbert")
+                            .department(fabShop)
+                            .crew(crewA)
+                            .supervisor(sarahSupervisor)
+                            .roleLabel("Employee")
+                            .shiftPatternName("Crew A | imported 5-4-4 rotation")
+                            .weeklyTargetHours(44)
+                            .active(true)
+                            .build()
+            );
+
+            Employee jamie = employeeRepository.save(
+                    Employee.builder()
+                            .employeeCode("EMP002")
+                            .name("Jamie Martin")
+                            .department(fabShop)
+                            .crew(crewA)
+                            .supervisor(sarahSupervisor)
+                            .roleLabel("Employee")
+                            .shiftPatternName("Crew A | imported 5-4-4 rotation")
+                            .weeklyTargetHours(44)
+                            .active(true)
+                            .build()
+            );
+
+            Employee guy = employeeRepository.save(
+                    Employee.builder()
+                            .employeeCode("EMP003")
+                            .name("Guy Quesnel")
+                            .department(shipping)
+                            .crew(crewB)
+                            .supervisor(sarahSupervisor)
+                            .roleLabel("Employee")
+                            .shiftPatternName("Crew B | imported 5-4-4 rotation")
+                            .weeklyTargetHours(44)
+                            .active(true)
+                            .build()
+            );
+
+            Employee will = employeeRepository.save(
+                    Employee.builder()
+                            .employeeCode("EMP004")
+                            .name("William Cote")
+                            .department(office)
+                            .crew(crewA)
+                            .supervisor(sarahSupervisor)
+                            .roleLabel("Employee")
+                            .shiftPatternName("Crew A | imported 5-4-4 rotation")
+                            .weeklyTargetHours(44)
+                            .active(true)
+                            .build()
+            );
+
+
+            // Users
+            userRepository.save(
+                    User.builder()
+                            .username("Riley")
+                            .passwordHash("Ril@Shop")
+                            .name("Riley Gilbert")
+                            .role(Role.EMPLOYEE)
+                            .employee(riley)
+                            .title("Employee")
+                            .active(true)
+                            .build()
+            );
+
+            userRepository.save(
+                    User.builder()
+                            .username("TonyM")
+                            .passwordHash("Tony@199!")
+                            .name("Tony Manager")
+                            .role(Role.SUPERVISOR)
+                            .supervisor(tonySupervisor)
+                            .title("Production Supervisor")
+                            .active(true)
+                            .build()
+            );
+
+            userRepository.save(
+                    User.builder()
+                            .username("Tony Marshall")
+                            .passwordHash("Tony@199!")
+                            .name("Anthony Marshall")
+                            .role(Role.ADMIN)
+                            .title("Operations / Payroll Admin")
+                            .active(true)
+                            .build()
+            );
             // Crew schedule - seed the current prototype week only first
             seedCrewSchedule(crewA, List.of(
                     LocalDate.of(2026, 4, 19),
