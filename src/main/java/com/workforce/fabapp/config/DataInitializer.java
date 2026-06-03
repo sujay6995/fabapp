@@ -40,81 +40,29 @@ public class DataInitializer {
     @Bean
     public CommandLineRunner seedData() {
         return args -> {
-            if (userRepository.count() > 0) {
-                ensureWorkType("QA");
-                ensureWorkType("Overhead");
-                return;
-            }
+            ensureDepartment("Fab Shop");
+            ensureDepartment("Laddle Bay");
+            ensureDepartment("Shipping");
+            ensureDepartment("Office");
 
-            // Departments
-            Department fabShop = departmentRepository.save(
-                    Department.builder().name("Fab Shop").build()
-            );
-            Department laddleBay = departmentRepository.save(
-                    Department.builder().name("Laddle Bay").build()
-            );
-            Department shipping = departmentRepository.save(
-                    Department.builder().name("Shipping").build()
-            );
+            Crew crewA = ensureCrew("Crew A");
+            Crew crewB = ensureCrew("Crew B");
 
-            Department office = departmentRepository.save(
-                    Department.builder().name("Office").build()
-            );
+            ensureWorkType("Blast");
+            ensureWorkType("Cut Material");
+            ensureWorkType("Fit");
+            ensureWorkType("Material Handle");
+            ensureWorkType("Overburn");
+            ensureWorkType("Overhead");
+            ensureWorkType("Other");
+            ensureWorkType("Paint");
+            ensureWorkType("QA");
+            ensureWorkType("Weld");
 
-            // Crews
-            Crew crewA = crewRepository.save(
-                    Crew.builder().name("Crew A").build()
-            );
-            Crew crewB = crewRepository.save(
-                    Crew.builder().name("Crew B").build()
-            );
-
-
-
-            // Work types
-            WorkType blast = workTypeRepository.save(
-                    WorkType.builder().name("Blast").countsTowardOt(true).build()
-            );
-            WorkType cutMaterial = workTypeRepository.save(
-                    WorkType.builder().name("Cut Material").countsTowardOt(true).build()
-            );
-            WorkType fit = workTypeRepository.save(
-                    WorkType.builder().name("Fit").countsTowardOt(true).build()
-            );
-
-            WorkType materialHandle = workTypeRepository.save(
-                    WorkType.builder().name("Material Handle").countsTowardOt(true).build()
-            );
-            WorkType overburn = workTypeRepository.save(
-                    WorkType.builder().name("Overburn").countsTowardOt(true).build()
-            );
-            WorkType other = workTypeRepository.save(
-                    WorkType.builder().name("Other").countsTowardOt(true).build()
-            );
-            WorkType paint = workTypeRepository.save(
-                    WorkType.builder().name("Paint").countsTowardOt(true).build()
-            );
-            WorkType qa = workTypeRepository.save(
-                    WorkType.builder().name("QA").countsTowardOt(true).build()
-            );
-
-            WorkType weld = workTypeRepository.save(
-                    WorkType.builder().name("Weld").countsTowardOt(true).build()
-            );
-
-            // Leave types
-            LeaveType vacation = leaveTypeRepository.save(
-                    LeaveType.builder().name("Vacation").build()
-            );
-            LeaveType sick = leaveTypeRepository.save(
-                    LeaveType.builder().name("Sick").build()
-            );
-            LeaveType personal = leaveTypeRepository.save(
-                    LeaveType.builder().name("Personal").build()
-            );
-            LeaveType unpaid = leaveTypeRepository.save(
-                    LeaveType.builder().name("Unpaid").build()
-            );
+            ensureLeaveType("Vacation");
+            ensureLeaveType("Sick");
+            ensureLeaveType("Personal");
+            ensureLeaveType("Unpaid");
 
 
             // Crew schedule - seed the current prototype week only first
@@ -143,20 +91,43 @@ public class DataInitializer {
 
     private void seedCrewSchedule(Crew crew, List<LocalDate> workdays) {
         for (LocalDate date : workdays) {
-            crewScheduleRepository.save(
-                    CrewSchedule.builder()
+            CrewSchedule schedule = crewScheduleRepository.findByCrewIdAndWorkDate(crew.getId(), date)
+                    .orElseGet(() -> CrewSchedule.builder()
                             .crew(crew)
                             .workDate(date)
-                            .isWorkday(true)
-                            .build()
-            );
+                            .build());
+
+            schedule.setIsWorkday(true);
+            crewScheduleRepository.save(schedule);
         }
     }
 
+    private Department ensureDepartment(String name) {
+        return departmentRepository.findByName(name)
+                .orElseGet(() -> departmentRepository.save(
+                        Department.builder().name(name).build()
+                ));
+    }
+
+    private Crew ensureCrew(String name) {
+        return crewRepository.findByName(name)
+                .orElseGet(() -> crewRepository.save(
+                        Crew.builder().name(name).build()
+                ));
+    }
+
     private WorkType ensureWorkType(String name) {
-        return workTypeRepository.findByName(name)
-                .orElseGet(() -> workTypeRepository.save(
-                        WorkType.builder().name(name).countsTowardOt(true).build()
+        WorkType workType = workTypeRepository.findByName(name)
+                .orElseGet(() -> WorkType.builder().name(name).build());
+
+        workType.setCountsTowardOt(true);
+        return workTypeRepository.save(workType);
+    }
+
+    private LeaveType ensureLeaveType(String name) {
+        return leaveTypeRepository.findByName(name)
+                .orElseGet(() -> leaveTypeRepository.save(
+                        LeaveType.builder().name(name).build()
                 ));
     }
 }
