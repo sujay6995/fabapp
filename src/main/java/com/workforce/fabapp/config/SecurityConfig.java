@@ -64,11 +64,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOriginPatterns(List.of(
+        configuration.setAllowedOrigins(List.of(
                 "https://fab-shop.anmar.ca",
-                "https://*.anmar.ca",
-                "https://*.azurestaticapps.net",
-                "http://localhost:4200"
+                "https://www.fab-shop.anmar.ca",
+                "https://mango-stone-00ee27210.7.azurestaticapps.net"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
