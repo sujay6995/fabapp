@@ -16,4 +16,9 @@ public interface JobRequestRepository extends JpaRepository<JobRequest, Long> {
     );
 
     List<JobRequest> findByStatusOrderByCreatedAtDesc(JobRequestStatus status);
+
+    List<JobRequest> findByRequestedJobNumberIgnoreCaseAndStatus(
+            String requestedJobNumber,
+            JobRequestStatus status
+    );
 }

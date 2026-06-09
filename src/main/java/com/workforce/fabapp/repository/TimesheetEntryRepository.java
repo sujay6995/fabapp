@@ -77,4 +77,6 @@ public interface TimesheetEntryRepository extends JpaRepository<TimesheetEntry, 
     List<Object[]> sumHoursByJobIdsAndWorkType(@Param("jobIds") Collection<Long> jobIds);
 
     List<TimesheetEntry> findByJobRequestId(Long jobRequestId);
+
+    List<TimesheetEntry> findByJobRequestIdIn(Collection<Long> jobRequestIds);
 }

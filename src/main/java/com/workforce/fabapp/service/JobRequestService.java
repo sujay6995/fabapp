@@ -6,10 +6,12 @@ import com.workforce.fabapp.dto.ReviewJobRequestDto;
 import com.workforce.fabapp.entity.Employee;
 import com.workforce.fabapp.entity.Job;
 import com.workforce.fabapp.entity.JobRequest;
+import com.workforce.fabapp.entity.TimesheetEntry;
 import com.workforce.fabapp.enums.JobRequestStatus;
 import com.workforce.fabapp.repository.EmployeeRepository;
 import com.workforce.fabapp.repository.JobRepository;
 import com.workforce.fabapp.repository.JobRequestRepository;
+import com.workforce.fabapp.repository.TimesheetEntryRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -26,6 +28,7 @@ public class JobRequestService {
     private final JobRequestRepository jobRequestRepository;
     private final EmployeeRepository employeeRepository;
     private final JobRepository jobRepository;
+    private final TimesheetEntryRepository timesheetEntryRepository;
 
     @Transactional
     public JobRequestResponseDto create(CreateJobRequestDto dto) {
@@ -102,13 +105,41 @@ public class JobRequestService {
 
         Job savedJob = jobRepository.save(job);
 
-        request.setStatus(JobRequestStatus.APPROVED_OPENED);
-        request.setOpenedJob(savedJob);
-        request.setReviewedBy(dto.getReviewedBy());
-        request.setReviewedAt(LocalDateTime.now());
-        request.setReviewNote(dto.getReviewNote());
+        LocalDateTime reviewedAt = LocalDateTime.now();
 
-        return map(jobRequestRepository.save(request));
+        List<JobRequest> matchingRequests = jobRequestRepository
+                .findByRequestedJobNumberIgnoreCaseAndStatus(
+                        request.getRequestedJobNumber(),
+                        JobRequestStatus.PENDING
+                );
+
+        for (JobRequest matchingRequest : matchingRequests) {
+            matchingRequest.setStatus(JobRequestStatus.APPROVED_OPENED);
+            matchingRequest.setOpenedJob(savedJob);
+            matchingRequest.setReviewedBy(dto.getReviewedBy());
+            matchingRequest.setReviewedAt(reviewedAt);
+            matchingRequest.setReviewNote(dto.getReviewNote());
+        }
+
+        jobRequestRepository.saveAll(matchingRequests);
+
+        List<Long> matchingRequestIds = matchingRequests.stream()
+                .map(JobRequest::getId)
+                .toList();
+
+        if (!matchingRequestIds.isEmpty()) {
+            List<TimesheetEntry> entries = timesheetEntryRepository.findByJobRequestIdIn(matchingRequestIds);
+
+            for (TimesheetEntry entry : entries) {
+                entry.setJob(savedJob);
+                entry.setJobRequest(null);
+            }
+
+            timesheetEntryRepository.saveAll(entries);
+        }
+
+        return map(jobRequestRepository.findById(requestId)
+                .orElseThrow(() -> new EntityNotFoundException("Job request not found")));
     }
 
     @Transactional
