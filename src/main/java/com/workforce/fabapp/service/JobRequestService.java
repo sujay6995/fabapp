@@ -14,6 +14,7 @@ import com.workforce.fabapp.repository.JobRequestRepository;
 import com.workforce.fabapp.repository.TimesheetEntryRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,6 +79,7 @@ public class JobRequestService {
     }
 
     @Transactional
+    @CacheEvict(value = {"timesheetWeeks", "timesheetIssues", "overtimeAllocations", "doubleTimeAllocations"}, allEntries = true)
     public JobRequestResponseDto approveAndOpen(Long requestId, ReviewJobRequestDto dto) {
         JobRequest request = jobRequestRepository.findById(requestId)
                 .orElseThrow(() -> new EntityNotFoundException("Job request not found"));
@@ -143,6 +145,7 @@ public class JobRequestService {
     }
 
     @Transactional
+    @CacheEvict(value = {"timesheetWeeks", "timesheetIssues", "overtimeAllocations", "doubleTimeAllocations"}, allEntries = true)
     public JobRequestResponseDto reject(Long requestId, ReviewJobRequestDto dto) {
         JobRequest request = jobRequestRepository.findById(requestId)
                 .orElseThrow(() -> new EntityNotFoundException("Job request not found"));
@@ -151,12 +154,25 @@ public class JobRequestService {
             throw new IllegalStateException("Only pending job requests can be rejected.");
         }
 
-        request.setStatus(JobRequestStatus.REJECTED);
-        request.setReviewedBy(dto.getReviewedBy());
-        request.setReviewedAt(LocalDateTime.now());
-        request.setReviewNote(dto.getReviewNote());
+        LocalDateTime reviewedAt = LocalDateTime.now();
 
-        return map(jobRequestRepository.save(request));
+        List<JobRequest> matchingRequests = jobRequestRepository
+                .findByRequestedJobNumberIgnoreCaseAndStatus(
+                        request.getRequestedJobNumber(),
+                        JobRequestStatus.PENDING
+                );
+
+        for (JobRequest matchingRequest : matchingRequests) {
+            matchingRequest.setStatus(JobRequestStatus.REJECTED);
+            matchingRequest.setReviewedBy(dto.getReviewedBy());
+            matchingRequest.setReviewedAt(reviewedAt);
+            matchingRequest.setReviewNote(dto.getReviewNote());
+        }
+
+        jobRequestRepository.saveAll(matchingRequests);
+
+        return map(jobRequestRepository.findById(requestId)
+                .orElseThrow(() -> new EntityNotFoundException("Job request not found")));
     }
 
     private JobRequestResponseDto map(JobRequest request) {
