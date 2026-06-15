@@ -3,6 +3,7 @@ package com.workforce.fabapp.service;
 import com.workforce.fabapp.dto.*;
 import com.workforce.fabapp.entity.*;
 import com.workforce.fabapp.enums.AttendanceEventKind;
+import com.workforce.fabapp.enums.JobRequestStatus;
 import com.workforce.fabapp.enums.LeaveStatus;
 import com.workforce.fabapp.enums.TimesheetStatus;
 import com.workforce.fabapp.repository.*;
@@ -219,6 +220,13 @@ public class TimesheetService {
                 .orElseThrow(() -> new EntityNotFoundException("Job request not found"))
                 : null;
 
+        if (job == null && jobRequest != null) {
+            job = resolveOpenedJob(jobRequest);
+            if (job != null) {
+                jobRequest = null;
+            }
+        }
+
         if (job != null && jobRequest != null) {
             throw new IllegalStateException("Entry cannot have both opened job and pending job request.");
         }
@@ -246,6 +254,45 @@ public class TimesheetService {
         }
 
         return entry;
+    }
+
+    private Job resolveOpenedJob(JobRequest jobRequest) {
+        Job openedJob = jobRequest.getOpenedJob();
+        if (openedJob == null && jobRequest.getRequestedJobNumber() != null) {
+            openedJob = jobRepository.findByCodeIgnoreCase(jobRequest.getRequestedJobNumber()).orElse(null);
+        }
+
+        if (openedJob == null) {
+            return null;
+        }
+
+        List<JobRequest> matchingRequests = jobRequestRepository
+                .findByRequestedJobNumberIgnoreCaseAndStatus(
+                        jobRequest.getRequestedJobNumber(),
+                        JobRequestStatus.PENDING
+                );
+
+        if (!matchingRequests.isEmpty()) {
+            LocalDateTime reviewedAt = LocalDateTime.now();
+            for (JobRequest matchingRequest : matchingRequests) {
+                matchingRequest.setStatus(JobRequestStatus.APPROVED_OPENED);
+                matchingRequest.setOpenedJob(openedJob);
+                matchingRequest.setReviewedAt(reviewedAt);
+            }
+            jobRequestRepository.saveAll(matchingRequests);
+
+            List<Long> matchingRequestIds = matchingRequests.stream()
+                    .map(JobRequest::getId)
+                    .toList();
+            List<TimesheetEntry> entries = timesheetEntryRepository.findByJobRequestIdIn(matchingRequestIds);
+            for (TimesheetEntry pendingEntry : entries) {
+                pendingEntry.setJob(openedJob);
+                pendingEntry.setJobRequest(null);
+            }
+            timesheetEntryRepository.saveAll(entries);
+        }
+
+        return openedJob;
     }
 
     private List<TimesheetIssueDto> getWeekIssuesInternal(TimesheetWeek week) {

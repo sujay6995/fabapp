@@ -88,7 +88,7 @@ public class JobRequestService {
             throw new IllegalStateException("Only pending job requests can be approved.");
         }
 
-        Job job = jobRepository.findByCode(request.getRequestedJobNumber())
+        Job job = jobRepository.findByCodeIgnoreCase(request.getRequestedJobNumber())
                 .orElseGet(Job::new);
 
         job.setCode(request.getRequestedJobNumber());

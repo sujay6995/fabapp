@@ -9,6 +9,7 @@ import java.util.Optional;
 
 public interface JobRepository extends JpaRepository<Job, Long> {
     Optional<Job> findByCode(String code);
+    Optional<Job> findByCodeIgnoreCase(String code);
     List<Job> findByActiveTrue();
     List<Job> findByActiveTrueAndClosedFalse();
     long countByActiveTrue();
