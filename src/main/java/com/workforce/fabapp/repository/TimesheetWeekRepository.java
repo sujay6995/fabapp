@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -66,8 +67,11 @@ public interface TimesheetWeekRepository extends JpaRepository<TimesheetWeek, Lo
     );
 
     List<TimesheetWeek> findByStatus(TimesheetStatus status);
+    long countByStatus(TimesheetStatus status);
 
     List<TimesheetWeek> findByWeekStart(LocalDate weekStart);
+
+    List<TimesheetWeek> findByEmployeeIdAndWeekStartIn(Long employeeId, Collection<LocalDate> weekStarts);
 
     @Query("""
             select week

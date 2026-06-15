@@ -9,10 +9,22 @@ import org.springframework.data.repository.query.Param;
 import java.time.LocalDate;
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 
 public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long> {
     List<LeaveRequest> findByEmployeeIdAndStatusOrderByStartDateDesc(Long employeeId, LeaveStatus status);
     long countByStatus(LeaveStatus status);
+
+    @Query("""
+            select leave
+            from LeaveRequest leave
+            join fetch leave.employee employee
+            join fetch employee.crew
+            left join fetch employee.supervisor
+            join fetch leave.leaveType
+            where leave.id = :leaveRequestId
+            """)
+    Optional<LeaveRequest> findByIdWithDetails(@Param("leaveRequestId") Long leaveRequestId);
 
     List<LeaveRequest> findByEmployeeIdOrderByStartDateDesc(Long employeeId);
 
