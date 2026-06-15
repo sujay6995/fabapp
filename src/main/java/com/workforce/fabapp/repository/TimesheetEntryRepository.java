@@ -1,6 +1,7 @@
 package com.workforce.fabapp.repository;
 
 import com.workforce.fabapp.entity.TimesheetEntry;
+import com.workforce.fabapp.enums.JobRequestStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,6 +13,18 @@ import java.util.List;
 public interface TimesheetEntryRepository extends JpaRepository<TimesheetEntry, Long> {
 
     List<TimesheetEntry> findByTimesheetWeekId(Long timesheetWeekId);
+
+    @Query("""
+            select count(e) > 0
+            from TimesheetEntry e
+            join e.jobRequest request
+            where e.timesheetWeek.id = :timesheetWeekId
+              and request.status = :status
+            """)
+    boolean existsByTimesheetWeekIdAndJobRequestStatus(
+            @Param("timesheetWeekId") Long timesheetWeekId,
+            @Param("status") JobRequestStatus status
+    );
 
     List<TimesheetEntry> findByTimesheetWeekIdAndWorkDate(Long timesheetWeekId, LocalDate workDate);
 

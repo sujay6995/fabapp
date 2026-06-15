@@ -16,7 +16,12 @@ import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,7 +37,7 @@ public class ApprovalService {
     @Transactional
     @CacheEvict(value = {"timesheetWeeks", "timesheetIssues", "attendance", "overtimeAllocations", "doubleTimeAllocations"}, allEntries = true)
     public void approveLeave(Long leaveRequestId, String actedBy, String note) {
-        LeaveRequest leave = leaveRequestRepository.findById(leaveRequestId)
+        LeaveRequest leave = leaveRequestRepository.findByIdWithDetails(leaveRequestId)
                 .orElseThrow(() -> new EntityNotFoundException("Leave request not found"));
 
         if (leave.getStatus() == LeaveStatus.APPROVED) {
@@ -64,7 +69,7 @@ public class ApprovalService {
     @Transactional
     @CacheEvict(value = {"timesheetWeeks", "timesheetIssues", "attendance", "overtimeAllocations", "doubleTimeAllocations"}, allEntries = true)
     public void rejectLeave(Long leaveRequestId, String actedBy, String note) {
-        LeaveRequest leave = leaveRequestRepository.findById(leaveRequestId)
+        LeaveRequest leave = leaveRequestRepository.findByIdWithDetails(leaveRequestId)
                 .orElseThrow(() -> new EntityNotFoundException("Leave request not found"));
 
         if (leave.getStatus() == LeaveStatus.APPROVED) {
@@ -94,7 +99,7 @@ public class ApprovalService {
     @Transactional
     @CacheEvict(value = {"timesheetWeeks", "timesheetIssues", "attendance", "overtimeAllocations", "doubleTimeAllocations"}, allEntries = true)
     public void approveTimesheet(Long weekId, String actedBy, String note) {
-        TimesheetWeek week = timesheetWeekRepository.findById(weekId)
+        TimesheetWeek week = timesheetWeekRepository.findByIdWithPeople(weekId)
                 .orElseThrow(() -> new EntityNotFoundException("Timesheet week not found"));
 
         if (Boolean.TRUE.equals(week.getPayrollLocked()) || week.getStatus() == TimesheetStatus.PAYROLL_LOCKED) {
@@ -108,12 +113,7 @@ public class ApprovalService {
         }
 
         boolean hasUnresolvedJobRequests = timesheetEntryRepository
-                .findByTimesheetWeekId(week.getId())
-                .stream()
-                .anyMatch(entry ->
-                        entry.getJobRequest() != null
-                                && entry.getJobRequest().getStatus() == JobRequestStatus.PENDING
-                );
+                .existsByTimesheetWeekIdAndJobRequestStatus(week.getId(), JobRequestStatus.PENDING);
 
         if (hasUnresolvedJobRequests) {
             throw new IllegalStateException("Timesheet has unresolved pending job requests.");
@@ -178,15 +178,12 @@ public class ApprovalService {
 
         Employee employee = leave.getEmployee();
 
-        List<LocalDate> allDates = leave.getStartDate()
-                .datesUntil(leave.getEndDate().plusDays(1))
-                .toList();
-
-        List<LocalDate> scheduledDates = allDates.stream()
-                .filter(date -> crewScheduleRepository
-                        .findByCrewIdAndWorkDate(employee.getCrew().getId(), date)
-                        .map(CrewSchedule::getIsWorkday)
-                        .orElse(false))
+        List<LocalDate> scheduledDates = crewScheduleRepository
+                .findByCrewIdAndWorkDateBetween(employee.getCrew().getId(), leave.getStartDate(), leave.getEndDate())
+                .stream()
+                .filter(schedule -> Boolean.TRUE.equals(schedule.getIsWorkday()))
+                .map(CrewSchedule::getWorkDate)
+                .sorted()
                 .toList();
 
         BigDecimal dailyHours = BigDecimal.ZERO;
@@ -195,39 +192,35 @@ public class ApprovalService {
                     .divide(BigDecimal.valueOf(scheduledDates.size()), 2, RoundingMode.HALF_UP);
         }
 
+        Set<LocalDate> weekStarts = scheduledDates.stream()
+                .map(this::normalizeToSunday)
+                .collect(Collectors.toSet());
+        Map<LocalDate, TimesheetWeek> weeksByStart = weekStarts.isEmpty()
+                ? new HashMap<>()
+                : new HashMap<>(timesheetWeekRepository.findByEmployeeIdAndWeekStartIn(employee.getId(), weekStarts)
+                .stream()
+                .collect(Collectors.toMap(TimesheetWeek::getWeekStart, week -> week)));
+
+        List<TimesheetEntry> entriesToCreate = new java.util.ArrayList<>();
         for (LocalDate date : scheduledDates) {
             LocalDate weekStart = normalizeToSunday(date);
 
-            TimesheetWeek week = timesheetWeekRepository
-                    .findByEmployeeIdAndWeekStart(employee.getId(), weekStart)
-                    .orElseGet(() -> createWeek(employee, weekStart));
+            TimesheetWeek week = weeksByStart.computeIfAbsent(weekStart, missingWeekStart -> createWeek(employee, missingWeekStart));
 
-            boolean exists = timesheetEntryRepository
-                    .findByTimesheetWeekIdAndWorkDate(week.getId(), date)
-                    .stream()
-                    .anyMatch(entry ->
-                            Boolean.TRUE.equals(entry.getAutoLeave())
-                                    && leave.getId().equals(entry.getSourceLeaveRequestId())
-                                    && date.equals(entry.getWorkDate())
-                    );
-
-            if (!exists) {
-                TimesheetEntry entry = TimesheetEntry.builder()
-                        .timesheetWeek(week)
-                        .workDate(date)
-                        .job(null)
-                        .jobRequest(null)
-                        .workType(null)
-                        .leaveType(leave.getLeaveType())
-                        .hours(dailyHours)
-                        .notes("Approved " + leave.getLeaveType().getName().toLowerCase())
-                        .autoLeave(Boolean.TRUE)
-                        .sourceLeaveRequestId(leave.getId())
-                        .build();
-
-                timesheetEntryRepository.save(entry);
-            }
+            entriesToCreate.add(TimesheetEntry.builder()
+                    .timesheetWeek(week)
+                    .workDate(date)
+                    .job(null)
+                    .jobRequest(null)
+                    .workType(null)
+                    .leaveType(leave.getLeaveType())
+                    .hours(dailyHours)
+                    .notes("Approved " + leave.getLeaveType().getName().toLowerCase())
+                    .autoLeave(Boolean.TRUE)
+                    .sourceLeaveRequestId(leave.getId())
+                    .build());
         }
+        timesheetEntryRepository.saveAll(entriesToCreate);
 
         leave.setAppliedToSchedule(Boolean.TRUE);
         leaveRequestRepository.save(leave);
