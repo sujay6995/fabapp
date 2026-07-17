@@ -21,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -55,27 +57,19 @@ public class OvertimeAllocationService {
             throw new IllegalStateException("Week is payroll locked.");
         }
 
-        overtimeAllocationRepository.deleteByTimesheetWeekId(weekId);
         LocalDateTime now = LocalDateTime.now();
+        List<PreparedOvertimeAllocation> preparedRows = prepareRows(week, rows);
 
-        for (int i = 0; i < rows.size(); i++) {
-            OvertimeAllocationRequestDto row = rows.get(i);
-            BigDecimal hours = row.getHours() == null ? BigDecimal.ZERO : row.getHours();
-            if (hours.compareTo(BigDecimal.ZERO) <= 0) {
-                continue;
-            }
+        overtimeAllocationRepository.deleteByTimesheetWeekId(weekId);
 
-            Job job = row.getJobId() == null
-                    ? null
-                    : jobRepository.findById(row.getJobId())
-                    .orElseThrow(() -> new EntityNotFoundException("Job not found"));
-
+        for (PreparedOvertimeAllocation preparedRow : preparedRows) {
             overtimeAllocationRepository.save(OvertimeAllocation.builder()
                     .timesheetWeek(week)
-                    .job(job)
-                    .hours(hours.setScale(2, RoundingMode.HALF_UP))
-                    .note(row.getNote())
-                    .sortOrder(i)
+                    .sourceEntry(preparedRow.sourceEntry())
+                    .job(preparedRow.job())
+                    .hours(preparedRow.hours())
+                    .note(preparedRow.note())
+                    .sortOrder(preparedRow.sortOrder())
                     .updatedBy(actor)
                     .updatedAt(now)
                     .build());
@@ -128,6 +122,7 @@ public class OvertimeAllocationService {
 
             overtimeAllocationRepository.save(OvertimeAllocation.builder()
                     .timesheetWeek(week)
+                    .sourceEntry(entry)
                     .job(entry.getJob())
                     .hours(assigned)
                     .note("Default OT from " + entry.getWorkDate())
@@ -146,6 +141,7 @@ public class OvertimeAllocationService {
         return OvertimeAllocationResponseDto.builder()
                 .id(row.getId())
                 .timesheetWeekId(row.getTimesheetWeek().getId())
+                .sourceEntryId(row.getSourceEntry() != null ? row.getSourceEntry().getId() : null)
                 .jobId(row.getJob() != null ? row.getJob().getId() : null)
                 .jobCode(row.getJob() != null ? row.getJob().getCode() : null)
                 .jobName(row.getJob() != null ? row.getJob().getName() : null)
@@ -155,5 +151,98 @@ public class OvertimeAllocationService {
                 .updatedBy(row.getUpdatedBy())
                 .updatedAt(row.getUpdatedAt())
                 .build();
+    }
+
+    private List<PreparedOvertimeAllocation> prepareRows(
+            TimesheetWeek week,
+            List<OvertimeAllocationRequestDto> rows
+    ) {
+        Map<Long, TimesheetEntry> sourceEntriesById = new HashMap<>();
+        Map<Long, BigDecimal> allocatedBySourceEntryId = new HashMap<>();
+
+        return java.util.stream.IntStream.range(0, rows.size())
+                .mapToObj(index -> prepareRow(
+                        week,
+                        rows.get(index),
+                        index,
+                        sourceEntriesById,
+                        allocatedBySourceEntryId
+                ))
+                .filter(row -> row != null)
+                .toList();
+    }
+
+    private PreparedOvertimeAllocation prepareRow(
+            TimesheetWeek week,
+            OvertimeAllocationRequestDto row,
+            int sortOrder,
+            Map<Long, TimesheetEntry> sourceEntriesById,
+            Map<Long, BigDecimal> allocatedBySourceEntryId
+    ) {
+        BigDecimal hours = row.getHours() == null ? BigDecimal.ZERO : row.getHours();
+        if (hours.compareTo(BigDecimal.ZERO) <= 0) {
+            return null;
+        }
+
+        if (row.getSourceEntryId() == null) {
+            throw new IllegalArgumentException("Source entry is required for overtime allocation.");
+        }
+
+        BigDecimal normalizedHours = hours.setScale(2, RoundingMode.HALF_UP);
+        TimesheetEntry sourceEntry = sourceEntriesById.computeIfAbsent(row.getSourceEntryId(), sourceEntryId ->
+                timesheetEntryRepository.findById(sourceEntryId)
+                        .orElseThrow(() -> new EntityNotFoundException("Source timesheet entry not found"))
+        );
+
+        validateSourceEntry(week, sourceEntry);
+
+        BigDecimal allocatedForSource = allocatedBySourceEntryId
+                .getOrDefault(sourceEntry.getId(), BigDecimal.ZERO)
+                .add(normalizedHours);
+        BigDecimal sourceHours = sourceEntry.getHours() == null ? BigDecimal.ZERO : sourceEntry.getHours();
+
+        if (allocatedForSource.compareTo(sourceHours) > 0) {
+            throw new IllegalArgumentException(
+                    "Allocated overtime cannot exceed submitted hours for source entry " + sourceEntry.getId()
+            );
+        }
+
+        allocatedBySourceEntryId.put(sourceEntry.getId(), allocatedForSource);
+
+        Job job = row.getJobId() == null
+                ? sourceEntry.getJob()
+                : jobRepository.findById(row.getJobId())
+                .orElseThrow(() -> new EntityNotFoundException("Job not found"));
+
+        return new PreparedOvertimeAllocation(
+                sourceEntry,
+                job,
+                normalizedHours,
+                row.getNote(),
+                sortOrder
+        );
+    }
+
+    private void validateSourceEntry(TimesheetWeek week, TimesheetEntry sourceEntry) {
+        if (!sourceEntry.getTimesheetWeek().getId().equals(week.getId())) {
+            throw new IllegalArgumentException("Source entry does not belong to the selected week.");
+        }
+
+        if (sourceEntry.getLeaveType() != null) {
+            throw new IllegalArgumentException("Leave entries cannot be used as overtime source entries.");
+        }
+
+        if (sourceEntry.getHours() == null || sourceEntry.getHours().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Source entry must have submitted hours.");
+        }
+    }
+
+    private record PreparedOvertimeAllocation(
+            TimesheetEntry sourceEntry,
+            Job job,
+            BigDecimal hours,
+            String note,
+            Integer sortOrder
+    ) {
     }
 }

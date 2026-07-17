@@ -23,10 +23,12 @@ import java.math.RoundingMode;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -44,7 +46,23 @@ public class PayrollExportService {
         LocalDate normalizedWeekStart = normalizeToSunday(weekStart);
         LocalDate weekEnd = normalizedWeekStart.plusDays(6);
 
-        List<TimesheetWeek> weeks = timesheetWeekRepository.findByWeekStart(normalizedWeekStart);
+        List<TimesheetWeek> weeks = timesheetWeekRepository.findByWeekStartWithPeople(normalizedWeekStart);
+        List<Long> weekIds = weeks.stream().map(TimesheetWeek::getId).toList();
+        Map<Long, List<TimesheetEntry>> entriesByWeekId = weekIds.isEmpty()
+                ? Collections.emptyMap()
+                : timesheetEntryRepository.findByTimesheetWeekIdsWithDetails(weekIds)
+                .stream()
+                .collect(Collectors.groupingBy(entry -> entry.getTimesheetWeek().getId()));
+        Map<Long, List<OvertimeAllocation>> overtimeByWeekId = weekIds.isEmpty()
+                ? Collections.emptyMap()
+                : overtimeAllocationRepository.findByTimesheetWeekIdsWithDetailsOrderBySortOrderAscIdAsc(weekIds)
+                .stream()
+                .collect(Collectors.groupingBy(allocation -> allocation.getTimesheetWeek().getId()));
+        Map<Long, List<DoubleTimeAllocation>> doubleTimeByWeekId = weekIds.isEmpty()
+                ? Collections.emptyMap()
+                : doubleTimeAllocationRepository.findByTimesheetWeekIdsAndStatusWithDetails(weekIds, DoubleTimeStatus.ACTIVE)
+                .stream()
+                .collect(Collectors.groupingBy(allocation -> allocation.getTimesheetWeek().getId()));
 
         List<String> blockingReasons = new ArrayList<>();
         List<PayrollExportRowDto> rows = new ArrayList<>();
@@ -55,7 +73,7 @@ public class PayrollExportService {
         BigDecimal grandTotal = BigDecimal.ZERO;
 
         for (TimesheetWeek week : weeks) {
-            List<TimesheetEntry> entries = timesheetEntryRepository.findByTimesheetWeekId(week.getId());
+            List<TimesheetEntry> entries = entriesByWeekId.getOrDefault(week.getId(), Collections.emptyList());
 
             boolean hasPendingJobRequest = entries.stream()
                     .anyMatch(entry ->
@@ -71,7 +89,12 @@ public class PayrollExportService {
                 );
             }
 
-            EmployeeWeekAllocation allocation = allocateEmployeeWeek(week, entries);
+            EmployeeWeekAllocation allocation = allocateEmployeeWeek(
+                    week,
+                    entries,
+                    overtimeByWeekId.getOrDefault(week.getId(), Collections.emptyList()),
+                    doubleTimeByWeekId.getOrDefault(week.getId(), Collections.emptyList())
+            );
             rows.addAll(allocation.rows());
 
             totalRegular = totalRegular.add(allocation.regularHours());
@@ -123,7 +146,12 @@ public class PayrollExportService {
         return csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
     }
 
-    private EmployeeWeekAllocation allocateEmployeeWeek(TimesheetWeek week, List<TimesheetEntry> entries) {
+    private EmployeeWeekAllocation allocateEmployeeWeek(
+            TimesheetWeek week,
+            List<TimesheetEntry> entries,
+            List<OvertimeAllocation> overtimeAllocations,
+            List<DoubleTimeAllocation> doubleTimeAllocations
+    ) {
         List<TimesheetEntry> workedEntries = entries.stream()
                 .filter(entry -> entry.getLeaveType() == null)
                 .filter(entry -> entry.getHours() != null && entry.getHours().compareTo(BigDecimal.ZERO) > 0)
@@ -170,11 +198,12 @@ public class PayrollExportService {
             bucket.totalHours = bucket.totalHours.add(hours);
         }
 
-        applyOvertimeAllocations(week, bucketMap);
-        applyDoubleTimeAllocationsAsReclassification(week, bucketMap);
+        applyOvertimeAllocations(week, workedEntries, bucketMap, overtimeAllocations);
+        applyDoubleTimeAllocationsAsReclassification(week, bucketMap, doubleTimeAllocations);
 
         List<PayrollExportRowDto> rows = bucketMap.values()
                 .stream()
+                .filter(bucket -> bucket.totalHours.compareTo(BigDecimal.ZERO) > 0)
                 .map(PayrollBucket::toDto)
                 .toList();
 
@@ -197,13 +226,26 @@ public class PayrollExportService {
         return new EmployeeWeekAllocation(rows, regularTotal, otTotal, dtTotal, total);
     }
 
-    private void applyOvertimeAllocations(TimesheetWeek week, Map<String, PayrollBucket> bucketMap) {
-        List<OvertimeAllocation> allocations = overtimeAllocationRepository
-                .findByTimesheetWeekIdOrderBySortOrderAscIdAsc(week.getId());
-
+    private void applyOvertimeAllocations(
+            TimesheetWeek week,
+            List<TimesheetEntry> workedEntries,
+            Map<String, PayrollBucket> bucketMap,
+            List<OvertimeAllocation> allocations
+    ) {
         if (allocations.isEmpty()) {
             return;
         }
+
+        Map<Long, TimesheetEntry> workedEntryById = workedEntries.stream()
+                .filter(entry -> entry.getId() != null)
+                .collect(Collectors.toMap(TimesheetEntry::getId, entry -> entry, (left, right) -> left));
+        Map<Long, BigDecimal> remainingSourceHoursByEntryId = workedEntries.stream()
+                .filter(entry -> entry.getId() != null)
+                .collect(Collectors.toMap(
+                        TimesheetEntry::getId,
+                        entry -> entry.getHours() != null ? entry.getHours() : BigDecimal.ZERO,
+                        BigDecimal::add
+                ));
 
         bucketMap.values().forEach(bucket -> {
             bucket.regularHours = bucket.totalHours;
@@ -212,13 +254,26 @@ public class PayrollExportService {
 
         for (OvertimeAllocation allocation : allocations) {
             if (allocation.getJob() == null
+                    || allocation.getSourceEntry() == null
                     || allocation.getHours() == null
                     || allocation.getHours().compareTo(BigDecimal.ZERO) <= 0) {
                 continue;
             }
 
-            String key = buildBucketKey(week.getEmployee().getId(), allocation.getJob().getCode());
-            PayrollBucket bucket = bucketMap.computeIfAbsent(key, k -> new PayrollBucket(
+            TimesheetEntry sourceEntry = workedEntryById.get(allocation.getSourceEntry().getId());
+            if (sourceEntry == null) {
+                continue;
+            }
+
+            PayrollJobInfo sourceJobInfo = resolveJobInfo(sourceEntry);
+            String sourceKey = buildBucketKey(week.getEmployee().getId(), sourceJobInfo.jobNumber());
+            PayrollBucket sourceBucket = bucketMap.get(sourceKey);
+            if (sourceBucket == null) {
+                continue;
+            }
+
+            String chargeKey = buildBucketKey(week.getEmployee().getId(), allocation.getJob().getCode());
+            PayrollBucket chargeBucket = bucketMap.computeIfAbsent(chargeKey, k -> new PayrollBucket(
                     week.getEmployee().getId(),
                     week.getEmployee().getName(),
                     allocation.getJob().getId(),
@@ -227,10 +282,30 @@ public class PayrollExportService {
                     safe(allocation.getJob().getXNumber())
             ));
 
-            BigDecimal available = bucket.regularHours.max(BigDecimal.ZERO);
-            BigDecimal applied = allocation.getHours().min(available);
-            bucket.regularHours = bucket.regularHours.subtract(applied);
-            bucket.otHours = bucket.otHours.add(applied);
+            BigDecimal remainingSourceHours = remainingSourceHoursByEntryId
+                    .getOrDefault(sourceEntry.getId(), BigDecimal.ZERO)
+                    .max(BigDecimal.ZERO);
+            BigDecimal availableInSourceBucket = sourceBucket.regularHours
+                    .min(sourceBucket.totalHours)
+                    .max(BigDecimal.ZERO);
+            BigDecimal applied = allocation.getHours()
+                    .min(remainingSourceHours)
+                    .min(availableInSourceBucket);
+
+            if (applied.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+
+            sourceBucket.regularHours = sourceBucket.regularHours.subtract(applied);
+            sourceBucket.totalHours = sourceBucket.totalHours.subtract(applied);
+
+            chargeBucket.otHours = chargeBucket.otHours.add(applied);
+            chargeBucket.totalHours = chargeBucket.totalHours.add(applied);
+
+            remainingSourceHoursByEntryId.put(
+                    sourceEntry.getId(),
+                    remainingSourceHours.subtract(applied).max(BigDecimal.ZERO)
+            );
         }
     }
 
@@ -241,11 +316,9 @@ public class PayrollExportService {
      */
     private void applyDoubleTimeAllocationsAsReclassification(
             TimesheetWeek week,
-            Map<String, PayrollBucket> bucketMap
+            Map<String, PayrollBucket> bucketMap,
+            List<DoubleTimeAllocation> dtAllocations
     ) {
-        List<DoubleTimeAllocation> dtAllocations = doubleTimeAllocationRepository
-                .findByTimesheetWeekIdAndStatus(week.getId(), DoubleTimeStatus.ACTIVE);
-
         for (DoubleTimeAllocation allocation : dtAllocations) {
             if (allocation.getJob() == null) {
                 continue;

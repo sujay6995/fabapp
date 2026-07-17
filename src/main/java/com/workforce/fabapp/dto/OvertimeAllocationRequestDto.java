@@ -8,6 +8,9 @@ import java.math.BigDecimal;
 @Data
 public class OvertimeAllocationRequestDto {
 
+    @NotNull
+    private Long sourceEntryId;
+
     private Long jobId;
 
     @NotNull

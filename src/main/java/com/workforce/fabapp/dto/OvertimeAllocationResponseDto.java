@@ -12,6 +12,7 @@ public class OvertimeAllocationResponseDto {
 
     private Long id;
     private Long timesheetWeekId;
+    private Long sourceEntryId;
     private Long jobId;
     private String jobCode;
     private String jobName;

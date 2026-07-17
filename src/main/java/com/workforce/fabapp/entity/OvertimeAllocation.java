@@ -27,6 +27,10 @@ public class OvertimeAllocation {
     @JoinColumn(name = "job_id")
     private Job job;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "source_entry_id")
+    private TimesheetEntry sourceEntry;
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal hours;
 
