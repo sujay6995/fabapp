@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,6 +26,22 @@ public interface DoubleTimeAllocationRepository extends JpaRepository<DoubleTime
             """)
     List<DoubleTimeAllocation> findByTimesheetWeekIdAndStatusWithDetails(
             @Param("timesheetWeekId") Long timesheetWeekId,
+            @Param("status") DoubleTimeStatus status
+    );
+
+    @Query("""
+            select allocation
+            from DoubleTimeAllocation allocation
+            join fetch allocation.timesheetWeek week
+            join fetch week.employee
+            left join fetch allocation.timesheetEntry
+            left join fetch allocation.job
+            where week.id in :timesheetWeekIds
+              and allocation.status = :status
+            order by week.id asc, allocation.id asc
+            """)
+    List<DoubleTimeAllocation> findByTimesheetWeekIdsAndStatusWithDetails(
+            @Param("timesheetWeekIds") Collection<Long> timesheetWeekIds,
             @Param("status") DoubleTimeStatus status
     );
 
