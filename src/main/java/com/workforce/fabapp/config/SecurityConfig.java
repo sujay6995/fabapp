@@ -51,6 +51,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/employees/**").authenticated()
                         .requestMatchers("/api/tasks/**").authenticated()
                         .requestMatchers("/api/attendance/**").authenticated()
+                        .requestMatchers("/api/allowances/**").authenticated()
                         .requestMatchers("/api/job-budgets/**").authenticated()
                         .anyRequest().authenticated()
                 );
@@ -67,6 +68,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(List.of(
                 "https://fab-shop.anmar.ca",
                 "https://www.fab-shop.anmar.ca",
+                "http://localhost:4200",
                 "https://mango-stone-00ee27210.7.azurestaticapps.net"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));

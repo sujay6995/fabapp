@@ -14,8 +14,13 @@ import org.springframework.context.annotation.Configuration;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Configuration
 @RequiredArgsConstructor
@@ -40,29 +45,64 @@ public class DataInitializer {
     @Bean
     public CommandLineRunner seedData() {
         return args -> {
-            Department fabShop = ensureDepartment("Fab Shop");
-            Department ladleBay = ensureDepartment("Ladle Bay");
-            Department shipping = ensureDepartment("Shipping");
-            Department office = ensureDepartment("Office");
+            Map<String, Department> departmentsByName = departmentRepository.findAll()
+                    .stream()
+                    .collect(Collectors.toMap(Department::getName, Function.identity(), (first, second) -> first));
+            Map<String, Crew> crewsByName = crewRepository.findAll()
+                    .stream()
+                    .collect(Collectors.toMap(Crew::getName, Function.identity(), (first, second) -> first));
+            Map<String, WorkType> workTypesByName = workTypeRepository.findAll()
+                    .stream()
+                    .collect(Collectors.toMap(WorkType::getName, Function.identity(), (first, second) -> first));
+            Map<String, LeaveType> leaveTypesByName = leaveTypeRepository.findAll()
+                    .stream()
+                    .collect(Collectors.toMap(LeaveType::getName, Function.identity(), (first, second) -> first));
 
-            Crew crewA = ensureCrew("Crew A");
-            Crew crewB = ensureCrew("Crew B");
+            Department fabShop = ensureDepartment(departmentsByName, "Fab Shop");
+            Department shipping = ensureDepartment(departmentsByName, "Shipping");
+            Department office = ensureDepartment(departmentsByName, "Office");
+            ensureDepartment(departmentsByName, "Ladle Bay");
 
-            ensureWorkType("Blast");
-            ensureWorkType("Cut Material");
-            ensureWorkType("Fit");
-            ensureWorkType("Material Handle");
-            ensureWorkType("Overburn");
-            ensureWorkType("Overhead");
-            ensureWorkType("Other");
-            ensureWorkType("Paint");
-            ensureWorkType("QA");
-            ensureWorkType("Weld");
+            Crew crewA = ensureCrew(crewsByName, "Crew A");
+            Crew crewB = ensureCrew(crewsByName, "Crew B");
 
-            ensureLeaveType("Vacation");
-            ensureLeaveType("Sick");
-            ensureLeaveType("Personal");
-            ensureLeaveType("Unpaid");
+            ensureWorkType(workTypesByName, "Blast");
+            ensureWorkType(workTypesByName, "Cut Material");
+            ensureWorkType(workTypesByName, "Fit");
+            ensureWorkType(workTypesByName, "Material Handle");
+            ensureWorkType(workTypesByName, "Overburn");
+            ensureWorkType(workTypesByName, "Overhead");
+            ensureWorkType(workTypesByName, "Other");
+            ensureWorkType(workTypesByName, "Paint");
+            ensureWorkType(workTypesByName, "QA");
+            ensureWorkType(workTypesByName, "Weld");
+
+            ensureLeaveType(leaveTypesByName, "Vacation");
+            ensureLeaveType(leaveTypesByName, "Sick");
+            ensureLeaveType(leaveTypesByName, "Personal");
+            ensureLeaveType(leaveTypesByName, "Unpaid");
+
+            seedCrewSchedule(crewA, List.of(
+                    LocalDate.of(2026, 4, 19),
+                    LocalDate.of(2026, 4, 20),
+                    LocalDate.of(2026, 4, 21),
+                    LocalDate.of(2026, 4, 27),
+                    LocalDate.of(2026, 4, 28),
+                    LocalDate.of(2026, 4, 29),
+                    LocalDate.of(2026, 4, 30)
+            ));
+
+            seedCrewSchedule(crewB, List.of(
+                    LocalDate.of(2026, 4, 22),
+                    LocalDate.of(2026, 4, 23),
+                    LocalDate.of(2026, 4, 24),
+                    LocalDate.of(2026, 4, 25),
+                    LocalDate.of(2026, 4, 26)
+            ));
+
+            if (userRepository.count() > 0) {
+                return;
+            }
 
             Supervisor sarahSupervisor = supervisorRepository.save(
                     Supervisor.builder()
@@ -176,69 +216,74 @@ public class DataInitializer {
                             .active(true)
                             .build()
             );
-            // Crew schedule - seed the current prototype week only first
-            seedCrewSchedule(crewA, List.of(
-                    LocalDate.of(2026, 4, 19),
-                    LocalDate.of(2026, 4, 20),
-                    LocalDate.of(2026, 4, 21),
-                    LocalDate.of(2026, 4, 27),
-                    LocalDate.of(2026, 4, 28),
-                    LocalDate.of(2026, 4, 29),
-                    LocalDate.of(2026, 4, 30)
-            ));
-
-            seedCrewSchedule(crewB, List.of(
-                    LocalDate.of(2026, 4, 22),
-                    LocalDate.of(2026, 4, 23),
-                    LocalDate.of(2026, 4, 24),
-                    LocalDate.of(2026, 4, 25),
-                    LocalDate.of(2026, 4, 26)
-            ));
-
-
-
         };
     }
 
     private void seedCrewSchedule(Crew crew, List<LocalDate> workdays) {
-        for (LocalDate date : workdays) {
-            CrewSchedule schedule = crewScheduleRepository.findByCrewIdAndWorkDate(crew.getId(), date)
-                    .orElseGet(() -> CrewSchedule.builder()
-                            .crew(crew)
-                            .workDate(date)
-                            .build());
-
-            schedule.setIsWorkday(true);
-            crewScheduleRepository.save(schedule);
+        if (workdays.isEmpty()) {
+            return;
         }
+
+        LocalDate start = workdays.stream().min(Comparator.naturalOrder()).orElseThrow();
+        LocalDate end = workdays.stream().max(Comparator.naturalOrder()).orElseThrow();
+        Map<LocalDate, CrewSchedule> schedulesByDate = crewScheduleRepository
+                .findByCrewIdAndWorkDateBetween(crew.getId(), start, end)
+                .stream()
+                .collect(Collectors.toMap(CrewSchedule::getWorkDate, Function.identity(), (first, second) -> first));
+
+        List<CrewSchedule> schedulesToSave = new ArrayList<>();
+        for (LocalDate date : workdays) {
+            CrewSchedule schedule = schedulesByDate.get(date);
+            if (schedule == null) {
+                schedulesToSave.add(CrewSchedule.builder()
+                        .crew(crew)
+                        .workDate(date)
+                        .isWorkday(true)
+                        .build());
+            } else if (!Boolean.TRUE.equals(schedule.getIsWorkday())) {
+                schedule.setIsWorkday(true);
+                schedulesToSave.add(schedule);
+            }
+        }
+
+        crewScheduleRepository.saveAll(schedulesToSave);
     }
 
-    private Department ensureDepartment(String name) {
-        return departmentRepository.findByName(name)
-                .orElseGet(() -> departmentRepository.save(
-                        Department.builder().name(name).build()
-                ));
+    private Department ensureDepartment(Map<String, Department> departmentsByName, String name) {
+        return departmentsByName.computeIfAbsent(name, missingName ->
+                departmentRepository.save(Department.builder().name(missingName).build())
+        );
     }
 
-    private Crew ensureCrew(String name) {
-        return crewRepository.findByName(name)
-                .orElseGet(() -> crewRepository.save(
-                        Crew.builder().name(name).build()
-                ));
+    private Crew ensureCrew(Map<String, Crew> crewsByName, String name) {
+        return crewsByName.computeIfAbsent(name, missingName ->
+                crewRepository.save(Crew.builder().name(missingName).build())
+        );
     }
 
-    private WorkType ensureWorkType(String name) {
-        WorkType workType = workTypeRepository.findByName(name)
-                .orElseGet(() -> WorkType.builder().name(name).build());
+    private WorkType ensureWorkType(Map<String, WorkType> workTypesByName, String name) {
+        WorkType workType = workTypesByName.get(name);
+        if (workType == null) {
+            workType = workTypeRepository.save(WorkType.builder()
+                    .name(name)
+                    .countsTowardOt(true)
+                    .build());
+            workTypesByName.put(name, workType);
+            return workType;
+        }
 
-        workType.setCountsTowardOt(true);
-        return workTypeRepository.save(workType);
+        if (!Boolean.TRUE.equals(workType.getCountsTowardOt())) {
+            workType.setCountsTowardOt(true);
+            workType = workTypeRepository.save(workType);
+            workTypesByName.put(name, workType);
+        }
+
+        return workType;
     }
 
-    private LeaveType ensureLeaveType(String name) {
-        return leaveTypeRepository.findByName(name)
-                .orElseGet(() -> leaveTypeRepository.save(
-                        LeaveType.builder().name(name).build()
-                ));
+    private LeaveType ensureLeaveType(Map<String, LeaveType> leaveTypesByName, String name) {
+        return leaveTypesByName.computeIfAbsent(name, missingName ->
+                leaveTypeRepository.save(LeaveType.builder().name(missingName).build())
+        );
     }
 }

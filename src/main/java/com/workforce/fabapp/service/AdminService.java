@@ -36,8 +36,8 @@ public class AdminService {
                 .activeEmployees(employeeRepository.countByActiveTrue())
                 .activeUsers(userRepository.countByActiveTrue())
                 .activeJobs(jobRepository.countByActiveTrue())
-                .submittedWeeks(timesheetWeekRepository.findByStatus(TimesheetStatus.SUBMITTED).size())
-                .approvedWeeks(timesheetWeekRepository.findByStatus(TimesheetStatus.APPROVED).size())
+                .submittedWeeks(timesheetWeekRepository.countByStatus(TimesheetStatus.SUBMITTED))
+                .approvedWeeks(timesheetWeekRepository.countByStatus(TimesheetStatus.APPROVED))
                 .pendingLeaveRequests(leaveRequestRepository.countByStatus(LeaveStatus.PENDING_SUPERVISOR))
                 .build();
     }

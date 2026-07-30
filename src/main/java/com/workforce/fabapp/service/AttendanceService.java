@@ -111,6 +111,7 @@ public class AttendanceService {
                 .map(event ->
                         event.getKind() == AttendanceEventKind.SICK_DAY
                                 || event.getKind() == AttendanceEventKind.MISSED_DAY
+                                || event.getKind() == AttendanceEventKind.BOOKED_DAY_OFF
                                 || event.getKind() == AttendanceEventKind.VACATION
                 )
                 .orElse(false);

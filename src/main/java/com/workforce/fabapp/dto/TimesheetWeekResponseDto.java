@@ -19,6 +19,7 @@ public class TimesheetWeekResponseDto {
     private LocalDateTime submittedAt;
     private LocalDateTime approvedAt;
     private Boolean payrollLocked;
+    private String sentBackReason;
     private Long supervisorId;
     private String supervisorName;
     private List<TimesheetEntryResponseDto> entries;

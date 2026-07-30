@@ -47,6 +47,7 @@ public class TimesheetService {
     private final AuditLogRepository auditLogRepository;
     private final JobRequestRepository jobRequestRepository;
     private final AttendanceEventRepository attendanceEventRepository;
+    private final ApprovalActionRepository approvalActionRepository;
     private final OvertimeAllocationService overtimeAllocationService;
 
     private record WeekIssueContext(
@@ -60,7 +61,6 @@ public class TimesheetService {
     }
 
     @Transactional
-    @Cacheable(value = "timesheetWeeks", key = "'employee:' + #employeeId + ':' + #weekStart")
     public TimesheetWeekResponseDto getOrCreateWeek(Long employeeId, LocalDate weekStart) {
         LocalDate normalizedWeekStart = normalizeToSunday(weekStart);
 
@@ -147,7 +147,6 @@ public class TimesheetService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "timesheetWeeks", key = "'supervisor:' + #supervisorId + ':' + #weekStart")
     public List<TimesheetWeekResponseDto> getSupervisorWeeks(Long supervisorId, LocalDate weekStart) {
         LocalDate normalizedWeekStart = normalizeToSunday(weekStart);
 
@@ -343,6 +342,7 @@ public class TimesheetService {
             boolean attendanceExcused = attendance != null
                     && (attendance.getKind() == AttendanceEventKind.SICK_DAY
                     || attendance.getKind() == AttendanceEventKind.MISSED_DAY
+                    || attendance.getKind() == AttendanceEventKind.BOOKED_DAY_OFF
                     || attendance.getKind() == AttendanceEventKind.VACATION);
 
             if (isWorkday && !hasApprovedLeave && !attendanceExcused
@@ -457,6 +457,7 @@ public class TimesheetService {
                 .submittedAt(week.getSubmittedAt())
                 .approvedAt(week.getApprovedAt())
                 .payrollLocked(week.getPayrollLocked())
+                .sentBackReason(getSentBackReason(week))
                 .supervisorId(week.getSupervisor() != null ? week.getSupervisor().getId() : null)
                 .supervisorName(week.getSupervisor() != null ? week.getSupervisor().getName() : null)
                 .entries(entries.stream().map(this::mapEntry).toList())
@@ -470,6 +471,22 @@ public class TimesheetService {
                         .otPayFactor(scale(OT_MULTIPLIER))
                         .build())
                 .build();
+    }
+
+    private String getSentBackReason(TimesheetWeek week) {
+        if (week.getStatus() != TimesheetStatus.SENT_BACK) {
+            return null;
+        }
+
+        return approvalActionRepository
+                .findFirstByRecordTypeAndRecordIdAndActionOrderByActedAtDesc(
+                        "Timesheet",
+                        week.getId(),
+                        "Sent Back"
+                )
+                .map(ApprovalAction::getNote)
+                .filter(note -> !note.isBlank())
+                .orElse("Please review and resubmit this timesheet.");
     }
 
     private Map<Long, List<TimesheetEntry>> loadEntriesByWeekId(List<TimesheetWeek> weeks) {

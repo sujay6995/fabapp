@@ -1,7 +1,6 @@
 package com.workforce.fabapp.service;
 
 import com.workforce.fabapp.entity.*;
-import com.workforce.fabapp.enums.JobRequestStatus;
 import com.workforce.fabapp.enums.LeaveStatus;
 import com.workforce.fabapp.enums.TimesheetStatus;
 import com.workforce.fabapp.repository.*;
@@ -110,13 +109,6 @@ public class ApprovalService {
                 && week.getStatus() != TimesheetStatus.REOPENED
                 && week.getStatus() != TimesheetStatus.SENT_BACK) {
             throw new IllegalStateException("Only submitted/reopened/sent-back weeks can be approved.");
-        }
-
-        boolean hasUnresolvedJobRequests = timesheetEntryRepository
-                .existsByTimesheetWeekIdAndJobRequestStatus(week.getId(), JobRequestStatus.PENDING);
-
-        if (hasUnresolvedJobRequests) {
-            throw new IllegalStateException("Timesheet has unresolved pending job requests.");
         }
 
         week.setStatus(TimesheetStatus.APPROVED);
