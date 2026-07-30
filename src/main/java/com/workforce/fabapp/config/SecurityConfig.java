@@ -52,6 +52,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/tasks/**").authenticated()
                         .requestMatchers("/api/attendance/**").authenticated()
                         .requestMatchers("/api/allowances/**").authenticated()
+                        .requestMatchers("/api/vacation-pay-requests/**").authenticated()
                         .requestMatchers("/api/job-budgets/**").authenticated()
                         .anyRequest().authenticated()
                 );

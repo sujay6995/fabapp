@@ -2,6 +2,7 @@ package com.workforce.fabapp.service;
 
 import com.workforce.fabapp.dto.PayrollExportResponseDto;
 import com.workforce.fabapp.dto.PayrollExportRowDto;
+import com.workforce.fabapp.dto.VacationPayRequestResponseDto;
 import com.workforce.fabapp.entity.DoubleTimeAllocation;
 import com.workforce.fabapp.entity.Job;
 import com.workforce.fabapp.entity.JobRequest;
@@ -14,6 +15,7 @@ import com.workforce.fabapp.repository.DoubleTimeAllocationRepository;
 import com.workforce.fabapp.repository.OvertimeAllocationRepository;
 import com.workforce.fabapp.repository.TimesheetEntryRepository;
 import com.workforce.fabapp.repository.TimesheetWeekRepository;
+import com.workforce.fabapp.repository.VacationPayRequestRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +42,7 @@ public class PayrollExportService {
     private final TimesheetEntryRepository timesheetEntryRepository;
     private final DoubleTimeAllocationRepository doubleTimeAllocationRepository;
     private final OvertimeAllocationRepository overtimeAllocationRepository;
+    private final VacationPayRequestRepository vacationPayRequestRepository;
 
     @Transactional(readOnly = true)
     public PayrollExportResponseDto getPayrollReview(LocalDate weekStart) {
@@ -47,6 +50,21 @@ public class PayrollExportService {
         LocalDate weekEnd = normalizedWeekStart.plusDays(6);
 
         List<TimesheetWeek> weeks = timesheetWeekRepository.findByWeekStartWithPeople(normalizedWeekStart);
+        List<VacationPayRequestResponseDto> vacationPayRequests = vacationPayRequestRepository
+                .findOverlappingWithDetails(normalizedWeekStart, weekEnd)
+                .stream()
+                .map(request -> VacationPayRequestResponseDto.builder()
+                        .id(request.getId())
+                        .employeeId(request.getEmployee().getId())
+                        .employeeName(request.getEmployee().getName())
+                        .startDate(request.getStartDate())
+                        .endDate(request.getEndDate())
+                        .status(request.getStatus().name())
+                        .submittedAt(request.getSubmittedAt())
+                        .processedAt(request.getProcessedAt())
+                        .processedBy(request.getProcessedBy())
+                        .build())
+                .toList();
         List<Long> weekIds = weeks.stream().map(TimesheetWeek::getId).toList();
         Map<Long, List<TimesheetEntry>> entriesByWeekId = weekIds.isEmpty()
                 ? Collections.emptyMap()
@@ -113,6 +131,7 @@ public class PayrollExportService {
                 .exportBlocked(!blockingReasons.isEmpty())
                 .blockingReasons(blockingReasons)
                 .rows(rows)
+                .vacationPayRequests(vacationPayRequests)
                 .build();
     }
 

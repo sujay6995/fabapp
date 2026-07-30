@@ -23,4 +23,5 @@ public class PayrollExportResponseDto {
     private List<String> blockingReasons;
 
     private List<PayrollExportRowDto> rows;
+    private List<VacationPayRequestResponseDto> vacationPayRequests;
 }
