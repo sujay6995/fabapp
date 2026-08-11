@@ -14,7 +14,7 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/payroll")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('ADMIN')")
+@PreAuthorize("hasAnyRole('ADMIN','PAYROLL')")
 public class PayrollExportController {
 
     private final PayrollExportService payrollExportService;

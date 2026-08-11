@@ -13,6 +13,8 @@ public class ReviewJobRequestDto {
 
     private String reviewNote;
 
+    private String jobNumber;
+
     private String jobName;
 
     private String xNumber;

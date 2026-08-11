@@ -88,11 +88,14 @@ public class JobRequestService {
             throw new IllegalStateException("Only pending job requests can be approved.");
         }
 
-        Job job = jobRepository.findByCodeIgnoreCase(request.getRequestedJobNumber())
+        String originalJobNumber = request.getRequestedJobNumber();
+        String reviewedJobNumber = firstNonBlank(dto.getJobNumber(), originalJobNumber, originalJobNumber).trim();
+
+        Job job = jobRepository.findByCodeIgnoreCase(reviewedJobNumber)
                 .orElseGet(Job::new);
 
-        job.setCode(request.getRequestedJobNumber());
-        job.setName(firstNonBlank(dto.getJobName(), request.getJobName(), "Job " + request.getRequestedJobNumber()));
+        job.setCode(reviewedJobNumber);
+        job.setName(firstNonBlank(dto.getJobName(), request.getJobName(), "Job " + reviewedJobNumber));
         job.setXNumber(firstNonBlank(dto.getXNumber(), request.getXNumber(), null));
         job.setCategory(firstNonBlank(dto.getCategory(), request.getCategory(), "PRODUCTION"));
         job.setTotalBudgetHours(dto.getTotalBudgetHours() != null ? dto.getTotalBudgetHours() : request.getTotalBudgetHours());
@@ -111,12 +114,13 @@ public class JobRequestService {
 
         List<JobRequest> matchingRequests = jobRequestRepository
                 .findByRequestedJobNumberIgnoreCaseAndStatus(
-                        request.getRequestedJobNumber(),
+                        originalJobNumber,
                         JobRequestStatus.PENDING
                 );
 
         for (JobRequest matchingRequest : matchingRequests) {
             matchingRequest.setStatus(JobRequestStatus.APPROVED_OPENED);
+            matchingRequest.setRequestedJobNumber(reviewedJobNumber);
             matchingRequest.setOpenedJob(savedJob);
             matchingRequest.setReviewedBy(dto.getReviewedBy());
             matchingRequest.setReviewedAt(reviewedAt);
