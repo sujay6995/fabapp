@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 
-@PreAuthorize("hasAnyRole('ADMIN','PAYROLL')")
+@PreAuthorize("hasRole('ADMIN')")
 @RestController
 @RequestMapping("/api/admin")
 @RequiredArgsConstructor

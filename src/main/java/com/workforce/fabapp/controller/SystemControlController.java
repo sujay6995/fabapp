@@ -19,7 +19,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/system")
 @RequiredArgsConstructor
-@PreAuthorize("hasAnyRole('ADMIN','PAYROLL')")
+@PreAuthorize("hasRole('ADMIN')")
 public class SystemControlController {
 
     private final SystemControlService systemControlService;
