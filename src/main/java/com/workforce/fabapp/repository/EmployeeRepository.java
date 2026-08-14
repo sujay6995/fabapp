@@ -27,6 +27,17 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
             join fetch employee.department
             join fetch employee.crew
             join fetch employee.supervisor
+            where employee.active = true
+            order by employee.name asc
+            """)
+    List<Employee> findAllActiveWithProfile();
+
+    @Query("""
+            select employee
+            from Employee employee
+            join fetch employee.department
+            join fetch employee.crew
+            join fetch employee.supervisor
             where employee.id = :employeeId
             """)
     Optional<Employee> findByIdWithProfile(@Param("employeeId") Long employeeId);

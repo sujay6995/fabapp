@@ -43,6 +43,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/history/**").hasRole("ADMIN")
                         .requestMatchers("/api/system/**").hasRole("ADMIN")
                         .requestMatchers("/api/approvals/**").hasAnyRole("SUPERVISOR", "ADMIN")
+                        .requestMatchers("/api/employees/active", "/api/leave/approved").hasAnyRole("SUPERVISOR", "ADMIN")
                         .requestMatchers("/api/supervisors/**").hasAnyRole("SUPERVISOR", "ADMIN")
                         .requestMatchers("/api/double-time/**").hasAnyRole("SUPERVISOR", "ADMIN")
                         .requestMatchers("/api/timesheets/**").authenticated()

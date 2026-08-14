@@ -6,6 +6,7 @@ import com.workforce.fabapp.repository.EmployeeRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -17,6 +18,14 @@ public class EmployeeService {
         Employee e = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new EntityNotFoundException("Employee not found"));
 
+        return map(e);
+    }
+
+    public List<EmployeeSummaryDto> getActiveEmployees() {
+        return employeeRepository.findAllActiveWithProfile().stream().map(this::map).toList();
+    }
+
+    private EmployeeSummaryDto map(Employee e) {
         return EmployeeSummaryDto.builder()
                 .id(e.getId())
                 .employeeCode(e.getEmployeeCode())

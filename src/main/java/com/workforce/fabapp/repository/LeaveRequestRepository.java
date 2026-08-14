@@ -64,4 +64,38 @@ public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long
     );
 
     List<LeaveRequest> findByApproverIdAndStatus(Long approverId, LeaveStatus status);
+
+    @Query("""
+            select leave
+            from LeaveRequest leave
+            join fetch leave.employee employee
+            join fetch leave.leaveType
+            where leave.approver.id = :supervisorId
+              and leave.status = :status
+              and leave.startDate <= :end
+              and leave.endDate >= :start
+            order by leave.startDate asc, employee.name asc
+            """)
+    List<LeaveRequest> findByApproverIdAndStatusOverlapping(
+            @Param("supervisorId") Long supervisorId,
+            @Param("status") LeaveStatus status,
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end
+    );
+
+    @Query("""
+            select leave
+            from LeaveRequest leave
+            join fetch leave.employee employee
+            join fetch leave.leaveType
+            where leave.status = :status
+              and leave.startDate <= :end
+              and leave.endDate >= :start
+            order by leave.startDate asc, employee.name asc
+            """)
+    List<LeaveRequest> findByStatusOverlapping(
+            @Param("status") LeaveStatus status,
+            @Param("start") LocalDate start,
+            @Param("end") LocalDate end
+    );
 }

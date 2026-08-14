@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/leave")
@@ -15,6 +16,14 @@ import java.util.List;
 public class LeaveController {
 
     private final LeaveRequestService leaveRequestService;
+
+    @GetMapping("/approved")
+    public List<LeaveRequestResponseDto> getApproved(
+            @RequestParam LocalDate start,
+            @RequestParam LocalDate end
+    ) {
+        return leaveRequestService.getApproved(start, end);
+    }
 
     @PostMapping
     public LeaveRequestResponseDto create(@Valid @RequestBody CreateLeaveRequestDto dto) {
@@ -29,5 +38,14 @@ public class LeaveController {
     @GetMapping("/pending/{supervisorId}")
     public List<LeaveRequestResponseDto> getPending(@PathVariable Long supervisorId) {
         return leaveRequestService.getPendingBySupervisor(supervisorId);
+    }
+
+    @GetMapping("/supervisor/{supervisorId}/approved")
+    public List<LeaveRequestResponseDto> getApproved(
+            @PathVariable Long supervisorId,
+            @RequestParam LocalDate start,
+            @RequestParam LocalDate end
+    ) {
+        return leaveRequestService.getApprovedBySupervisor(supervisorId, start, end);
     }
 }

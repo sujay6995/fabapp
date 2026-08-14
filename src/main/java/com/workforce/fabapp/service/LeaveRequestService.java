@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor
@@ -55,6 +56,29 @@ public class LeaveRequestService {
 
     public List<LeaveRequestResponseDto> getPendingBySupervisor(Long supervisorId) {
         return leaveRequestRepository.findByApproverIdAndStatus(supervisorId, LeaveStatus.PENDING_SUPERVISOR)
+                .stream()
+                .map(this::map)
+                .toList();
+    }
+
+    public List<LeaveRequestResponseDto> getApprovedBySupervisor(
+            Long supervisorId,
+            LocalDate start,
+            LocalDate end
+    ) {
+        return leaveRequestRepository.findByApproverIdAndStatusOverlapping(
+                        supervisorId,
+                        LeaveStatus.APPROVED,
+                        start,
+                        end
+                )
+                .stream()
+                .map(this::map)
+                .toList();
+    }
+
+    public List<LeaveRequestResponseDto> getApproved(LocalDate start, LocalDate end) {
+        return leaveRequestRepository.findByStatusOverlapping(LeaveStatus.APPROVED, start, end)
                 .stream()
                 .map(this::map)
                 .toList();
