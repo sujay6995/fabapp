@@ -180,6 +180,10 @@ public class JobRequestService {
     }
 
     private JobRequestResponseDto map(JobRequest request) {
+        TimesheetEntry linkedEntry = timesheetEntryRepository.findByJobRequestId(request.getId())
+                .stream()
+                .findFirst()
+                .orElse(null);
         return JobRequestResponseDto.builder()
                 .id(request.getId())
                 .requestedJobNumber(request.getRequestedJobNumber())
@@ -200,6 +204,10 @@ public class JobRequestService {
                 .reviewedBy(request.getReviewedBy())
                 .reviewedAt(request.getReviewedAt())
                 .reviewNote(request.getReviewNote())
+                .timesheetWeekId(linkedEntry != null ? linkedEntry.getTimesheetWeek().getId() : null)
+                .timesheetEntryId(linkedEntry != null ? linkedEntry.getId() : null)
+                .weekStart(linkedEntry != null ? linkedEntry.getTimesheetWeek().getWeekStart() : null)
+                .workDate(linkedEntry != null ? linkedEntry.getWorkDate() : null)
                 .build();
     }
 

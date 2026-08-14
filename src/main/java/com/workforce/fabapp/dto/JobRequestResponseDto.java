@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
@@ -28,4 +29,8 @@ public class JobRequestResponseDto {
     private String reviewedBy;
     private LocalDateTime reviewedAt;
     private String reviewNote;
+    private Long timesheetWeekId;
+    private Long timesheetEntryId;
+    private LocalDate weekStart;
+    private LocalDate workDate;
 }
