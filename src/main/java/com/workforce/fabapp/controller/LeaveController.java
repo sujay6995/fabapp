@@ -5,6 +5,7 @@ import com.workforce.fabapp.dto.LeaveRequestResponseDto;
 import com.workforce.fabapp.service.LeaveRequestService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -47,5 +48,14 @@ public class LeaveController {
             @RequestParam LocalDate end
     ) {
         return leaveRequestService.getApprovedBySupervisor(supervisorId, start, end);
+    }
+
+    @PreAuthorize("hasAnyRole('SUPERVISOR','ADMIN')")
+    @DeleteMapping("/{leaveRequestId}")
+    public void delete(
+            @PathVariable Long leaveRequestId,
+            @RequestParam(defaultValue = "System") String actor
+    ) {
+        leaveRequestService.deletePending(leaveRequestId, actor);
     }
 }

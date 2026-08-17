@@ -3,18 +3,23 @@ package com.workforce.fabapp.service;
 import com.workforce.fabapp.dto.CreateLeaveRequestDto;
 import com.workforce.fabapp.dto.LeaveRequestResponseDto;
 import com.workforce.fabapp.entity.Employee;
+import com.workforce.fabapp.entity.AuditLog;
 import com.workforce.fabapp.entity.LeaveRequest;
 import com.workforce.fabapp.entity.LeaveType;
 import com.workforce.fabapp.enums.LeaveStatus;
 import com.workforce.fabapp.repository.EmployeeRepository;
+import com.workforce.fabapp.repository.AuditLogRepository;
 import com.workforce.fabapp.repository.LeaveRequestRepository;
 import com.workforce.fabapp.repository.LeaveTypeRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +28,7 @@ public class LeaveRequestService {
     private final LeaveRequestRepository leaveRequestRepository;
     private final EmployeeRepository employeeRepository;
     private final LeaveTypeRepository leaveTypeRepository;
+    private final AuditLogRepository auditLogRepository;
 
     public LeaveRequestResponseDto create(CreateLeaveRequestDto dto) {
         Employee employee = employeeRepository.findById(dto.getEmployeeId())
@@ -82,6 +88,27 @@ public class LeaveRequestService {
                 .stream()
                 .map(this::map)
                 .toList();
+    }
+
+    @Transactional
+    @CacheEvict(value = {"timesheetWeeks", "timesheetIssues", "attendance"}, allEntries = true)
+    public void deletePending(Long leaveRequestId, String actor) {
+        LeaveRequest leave = leaveRequestRepository.findByIdWithDetails(leaveRequestId)
+                .orElseThrow(() -> new EntityNotFoundException("Leave request not found"));
+
+        if (leave.getStatus() != LeaveStatus.PENDING_SUPERVISOR) {
+            throw new IllegalStateException("Only pending leave requests can be removed.");
+        }
+
+        String actedBy = actor != null && !actor.isBlank() ? actor : "System";
+        String employeeName = leave.getEmployee().getName();
+        leaveRequestRepository.delete(leave);
+
+        auditLogRepository.save(AuditLog.builder()
+                .actor(actedBy)
+                .item("Pending leave request removed for " + employeeName)
+                .at(LocalDateTime.now())
+                .build());
     }
 
     private LeaveRequestResponseDto map(LeaveRequest lr) {
