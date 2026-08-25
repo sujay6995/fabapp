@@ -35,6 +35,7 @@ public class SystemControlService {
     private final BootAllowanceRequestRepository bootAllowanceRequestRepository;
     private final BootReceiptRepository bootReceiptRepository;
     private final VacationPayRequestRepository vacationPayRequestRepository;
+    private final DayOffWorkRequestRepository dayOffWorkRequestRepository;
 
     @Transactional(readOnly = true)
     public List<HolidayResponseDto> getHolidays() {
@@ -101,6 +102,7 @@ public class SystemControlService {
         backup.put("bootAllowanceRequests", bootAllowanceRequestRepository.findAll());
         backup.put("bootReceipts", bootReceiptRepository.findAll());
         backup.put("vacationPayRequests", vacationPayRequestRepository.findAll());
+        backup.put("dayOffWorkRequests", dayOffWorkRequestRepository.findAll());
 
         long count =
                 holidayRepository.count()
@@ -116,6 +118,7 @@ public class SystemControlService {
                         + bootAllowanceRequestRepository.count()
                         + bootReceiptRepository.count()
                         + vacationPayRequestRepository.count();
+        count += dayOffWorkRequestRepository.count();
 
         String filename = "system-backup-" + System.currentTimeMillis() + ".json";
 
@@ -153,6 +156,7 @@ public class SystemControlService {
         bootAllowanceRequestRepository.deleteAll();
         bootReceiptRepository.deleteAll();
         vacationPayRequestRepository.deleteAll();
+        dayOffWorkRequestRepository.deleteAll();
 
         /*
          * Keep jobs but archive/clear operational flags if needed.
