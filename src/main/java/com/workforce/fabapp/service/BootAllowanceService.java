@@ -37,22 +37,38 @@ public class BootAllowanceService {
     @Transactional
     public BootReceiptUploadResponseDto uploadReceipt(MultipartFile receipt) {
         if (receipt == null || receipt.isEmpty()) {
-            throw new IllegalArgumentException("Receipt photo is required.");
+            throw new IllegalArgumentException("Receipt file is required.");
         }
 
         if (receipt.getSize() > MAX_RECEIPT_BYTES) {
-            throw new IllegalArgumentException("Receipt photo must be 10 MB or smaller.");
+            throw new IllegalArgumentException("Receipt file must be 10 MB or smaller.");
         }
 
-        String contentType = receipt.getContentType() == null ? "" : receipt.getContentType();
-        if (!contentType.startsWith("image/")) {
-            throw new IllegalArgumentException("Receipt must be an image.");
-        }
-
-        String storageKey = UUID.randomUUID().toString();
         String fileName = receipt.getOriginalFilename() == null || receipt.getOriginalFilename().isBlank()
                 ? "receipt"
                 : receipt.getOriginalFilename();
+        String contentType = receipt.getContentType() == null ? "" : receipt.getContentType().toLowerCase();
+        String lowerFileName = fileName.toLowerCase();
+        boolean allowedType = contentType.equals("image/png")
+                || contentType.equals("image/jpeg")
+                || contentType.equals("image/jpg")
+                || contentType.equals("application/pdf");
+        boolean allowedExtension = lowerFileName.endsWith(".png")
+                || lowerFileName.endsWith(".jpg")
+                || lowerFileName.endsWith(".jpeg")
+                || lowerFileName.endsWith(".pdf");
+        boolean genericType = contentType.isBlank() || "application/octet-stream".equals(contentType);
+        if (!allowedType && !(genericType && allowedExtension)) {
+            throw new IllegalArgumentException("Receipt must be a PNG, JPG/JPEG, or PDF file.");
+        }
+        if (genericType) {
+            contentType = lowerFileName.endsWith(".pdf") ? "application/pdf"
+                    : lowerFileName.endsWith(".png") ? "image/png" : "image/jpeg";
+        } else if ("image/jpg".equals(contentType)) {
+            contentType = "image/jpeg";
+        }
+
+        String storageKey = UUID.randomUUID().toString();
 
         try {
             bootReceiptRepository.save(BootReceipt.builder()
@@ -64,7 +80,7 @@ public class BootAllowanceService {
                     .uploadedAt(LocalDateTime.now())
                     .build());
         } catch (IOException ex) {
-            throw new IllegalStateException("Could not read receipt photo.");
+            throw new IllegalStateException("Could not read receipt file.");
         }
 
         return BootReceiptUploadResponseDto.builder()
