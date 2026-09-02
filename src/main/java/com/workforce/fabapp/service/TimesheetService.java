@@ -49,6 +49,7 @@ public class TimesheetService {
     private final AttendanceEventRepository attendanceEventRepository;
     private final ApprovalActionRepository approvalActionRepository;
     private final OvertimeAllocationService overtimeAllocationService;
+    private final JobRequestResolutionService jobRequestResolutionService;
 
     private record WeekIssueContext(
             Map<Long, Map<LocalDate, CrewSchedule>> schedulesByCrewId,
@@ -146,9 +147,11 @@ public class TimesheetService {
         return getWeekIssuesInternal(week);
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<TimesheetWeekResponseDto> getSupervisorWeeks(Long supervisorId, LocalDate weekStart) {
         LocalDate normalizedWeekStart = normalizeToSunday(weekStart);
+
+        jobRequestResolutionService.resolvePendingRequestsForExistingJobs();
 
         List<TimesheetWeek> weeks = timesheetWeekRepository.findBySupervisorIdAndWeekStartWithPeople(supervisorId, normalizedWeekStart)
                 .stream()

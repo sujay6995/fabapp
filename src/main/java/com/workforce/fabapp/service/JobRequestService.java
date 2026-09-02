@@ -30,6 +30,7 @@ public class JobRequestService {
     private final EmployeeRepository employeeRepository;
     private final JobRepository jobRepository;
     private final TimesheetEntryRepository timesheetEntryRepository;
+    private final JobRequestResolutionService jobRequestResolutionService;
 
     @Transactional
     public JobRequestResponseDto create(CreateJobRequestDto dto) {
@@ -61,8 +62,9 @@ public class JobRequestService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<JobRequestResponseDto> getPendingBySupervisor(Long supervisorId) {
+        jobRequestResolutionService.resolvePendingRequestsForExistingJobs();
         return jobRequestRepository
                 .findBySupervisorIdAndStatusOrderByCreatedAtDesc(supervisorId, JobRequestStatus.PENDING)
                 .stream()
@@ -70,8 +72,9 @@ public class JobRequestService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public List<JobRequestResponseDto> getAllPending() {
+        jobRequestResolutionService.resolvePendingRequestsForExistingJobs();
         return jobRequestRepository.findByStatusOrderByCreatedAtDesc(JobRequestStatus.PENDING)
                 .stream()
                 .map(this::map)
