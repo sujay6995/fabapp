@@ -45,4 +45,6 @@ public interface OvertimeAllocationRepository extends JpaRepository<OvertimeAllo
     );
 
     void deleteByTimesheetWeekId(Long timesheetWeekId);
+
+    void deleteBySourceEntryId(Long sourceEntryId);
 }

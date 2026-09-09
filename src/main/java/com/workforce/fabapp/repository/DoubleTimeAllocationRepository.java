@@ -59,4 +59,6 @@ public interface DoubleTimeAllocationRepository extends JpaRepository<DoubleTime
     List<DoubleTimeAllocation> findByTimesheetWeekId(Long timesheetWeekId);
 
     List<DoubleTimeAllocation> findByJobIdAndStatus(Long jobId, DoubleTimeStatus status);
+
+    void deleteByTimesheetEntryId(Long timesheetEntryId);
 }

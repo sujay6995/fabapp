@@ -50,6 +50,8 @@ public class TimesheetService {
     private final ApprovalActionRepository approvalActionRepository;
     private final OvertimeAllocationService overtimeAllocationService;
     private final JobRequestResolutionService jobRequestResolutionService;
+    private final OvertimeAllocationRepository overtimeAllocationRepository;
+    private final DoubleTimeAllocationRepository doubleTimeAllocationRepository;
 
     private record WeekIssueContext(
             Map<Long, Map<LocalDate, CrewSchedule>> schedulesByCrewId,
@@ -107,7 +109,9 @@ public class TimesheetService {
                 .orElseThrow(() -> new EntityNotFoundException("Timesheet entry not found"));
 
         touchWeekForEdit(entry.getTimesheetWeek(), actor);
+        deleteEntryAllocations(entry.getId());
         timesheetEntryRepository.delete(entry);
+        timesheetEntryRepository.flush();
     }
 
     @Transactional
@@ -175,9 +179,17 @@ public class TimesheetService {
                 .filter(entry -> entry.getHours() == null || entry.getHours().compareTo(BigDecimal.ZERO) <= 0)
                 .toList();
         if (!emptyLines.isEmpty()) {
+            emptyLines.forEach(entry -> deleteEntryAllocations(entry.getId()));
             timesheetEntryRepository.deleteAll(emptyLines);
             timesheetEntryRepository.flush();
         }
+    }
+
+    private void deleteEntryAllocations(Long entryId) {
+        overtimeAllocationRepository.deleteBySourceEntryId(entryId);
+        doubleTimeAllocationRepository.deleteByTimesheetEntryId(entryId);
+        overtimeAllocationRepository.flush();
+        doubleTimeAllocationRepository.flush();
     }
 
     private TimesheetWeek createWeek(Long employeeId, LocalDate weekStart) {
