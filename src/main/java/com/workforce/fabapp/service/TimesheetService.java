@@ -69,6 +69,7 @@ public class TimesheetService {
                 .findByEmployeeIdAndWeekStartWithPeople(employeeId, normalizedWeekStart)
                 .orElseGet(() -> createWeek(employeeId, normalizedWeekStart));
 
+        removeEmptyJobLines(week);
         return mapWeek(week);
     }
 
@@ -158,7 +159,25 @@ public class TimesheetService {
                 .sorted(Comparator.comparing(w -> w.getEmployee().getName()))
                 .toList();
 
+        weeks.forEach(this::removeEmptyJobLines);
         return mapWeeks(weeks);
+    }
+
+    private void removeEmptyJobLines(TimesheetWeek week) {
+        if (Boolean.TRUE.equals(week.getPayrollLocked()) || week.getStatus() == TimesheetStatus.PAYROLL_LOCKED) {
+            return;
+        }
+
+        List<TimesheetEntry> emptyLines = timesheetEntryRepository.findByTimesheetWeekId(week.getId()).stream()
+                .filter(entry -> entry.getJob() == null)
+                .filter(entry -> entry.getJobRequest() == null)
+                .filter(entry -> entry.getLeaveType() == null)
+                .filter(entry -> entry.getHours() == null || entry.getHours().compareTo(BigDecimal.ZERO) <= 0)
+                .toList();
+        if (!emptyLines.isEmpty()) {
+            timesheetEntryRepository.deleteAll(emptyLines);
+            timesheetEntryRepository.flush();
+        }
     }
 
     private TimesheetWeek createWeek(Long employeeId, LocalDate weekStart) {
