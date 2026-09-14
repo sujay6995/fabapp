@@ -19,8 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -107,8 +107,11 @@ public class JobRequestService {
         job.setClosed(false);
         job.setActive(true);
 
-        if (job.getCrews() == null || job.getCrews().isEmpty()) {
-            job.setCrews(Set.of(request.getEmployee().getCrew()));
+        if (job.getCrews() == null) {
+            job.setCrews(new HashSet<>());
+        }
+        if (job.getCrews().isEmpty() && request.getEmployee().getCrew() != null) {
+            job.getCrews().add(request.getEmployee().getCrew());
         }
 
         Job savedJob = jobRepository.save(job);
