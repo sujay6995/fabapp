@@ -188,8 +188,9 @@ public class PayrollExportService {
             BigDecimal regular;
             BigDecimal ot;
 
-            boolean countsTowardOt = entry.getWorkType() != null
-                    && Boolean.TRUE.equals(entry.getWorkType().getCountsTowardOt());
+            // Stat holiday pay is regular pay, separate from the 44 worked-hour
+            // threshold, matching the supervisor's timesheet calculation.
+            boolean countsTowardOt = !isStatPayEntry(entry);
 
             if (countsTowardOt) {
                 regular = hours.min(remainingRegular.max(BigDecimal.ZERO));
@@ -266,6 +267,23 @@ public class PayrollExportService {
                         BigDecimal::add
                 ));
 
+        // A saved placement can redistribute OT, but cannot create or remove it.
+        // Ignore stale or incomplete maps and retain the calculated split.
+        BigDecimal calculatedOt = bucketMap.values().stream()
+                .map(bucket -> bucket.otHours).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal allocatedOt = BigDecimal.ZERO;
+        Map<Long, BigDecimal> sourceTotals = new LinkedHashMap<>();
+        for (OvertimeAllocation allocation : allocations) {
+            if (allocation.getJob() == null || allocation.getSourceEntry() == null
+                    || allocation.getHours() == null || allocation.getHours().signum() <= 0) return;
+            TimesheetEntry source = workedEntryById.get(allocation.getSourceEntry().getId());
+            if (source == null || isStatPayEntry(source)) return;
+            BigDecimal sourceTotal = sourceTotals.merge(source.getId(), allocation.getHours(), BigDecimal::add);
+            if (sourceTotal.compareTo(source.getHours()) > 0) return;
+            allocatedOt = allocatedOt.add(allocation.getHours());
+        }
+        if (allocatedOt.compareTo(calculatedOt) != 0) return;
+
         bucketMap.values().forEach(bucket -> {
             bucket.regularHours = bucket.totalHours;
             bucket.otHours = BigDecimal.ZERO;
@@ -326,6 +344,10 @@ public class PayrollExportService {
                     remainingSourceHours.subtract(applied).max(BigDecimal.ZERO)
             );
         }
+    }
+
+    private boolean isStatPayEntry(TimesheetEntry entry) {
+        return "226511".equals(resolveJobInfo(entry).jobNumber().trim());
     }
 
     /*
