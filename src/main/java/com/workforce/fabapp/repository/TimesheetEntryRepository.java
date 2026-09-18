@@ -11,6 +11,8 @@ import java.util.Collection;
 import java.util.List;
 
 public interface TimesheetEntryRepository extends JpaRepository<TimesheetEntry, Long> {
+    @Query("select count(e) > 0 from TimesheetEntry e where e.job.id = :jobId and (e.timesheetWeek.payrollLocked = true or e.timesheetWeek.status = com.workforce.fabapp.enums.TimesheetStatus.PAYROLL_LOCKED)")
+    boolean hasLockedPayrollJob(@Param("jobId") Long jobId);
 
     List<TimesheetEntry> findByTimesheetWeekId(Long timesheetWeekId);
 

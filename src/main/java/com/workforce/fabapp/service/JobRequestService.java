@@ -87,6 +87,14 @@ public class JobRequestService {
         JobRequest request = jobRequestRepository.findById(requestId)
                 .orElseThrow(() -> new EntityNotFoundException("Job request not found"));
 
+        // Approving one job number also resolves any duplicate pending requests for
+        // that number. A stale screen can therefore retry an already completed
+        // request; return its completed state instead of treating that retry as a
+        // bad request.
+        if (request.getStatus() == JobRequestStatus.APPROVED_OPENED) {
+            return map(request);
+        }
+
         if (request.getStatus() != JobRequestStatus.PENDING) {
             throw new IllegalStateException("Only pending job requests can be approved.");
         }

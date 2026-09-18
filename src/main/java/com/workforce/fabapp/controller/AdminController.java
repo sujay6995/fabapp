@@ -43,6 +43,13 @@ public class AdminController {
         return adminService.getEmployees();
     }
 
+    @PutMapping("/jobs/{jobId}/number")
+    public AdminJobDto correctJobNumber(@PathVariable Long jobId,
+            @Valid @RequestBody CorrectJobNumberDto dto, java.security.Principal principal) {
+        return adminService.correctJobNumber(jobId, dto, principal.getName());
+    }
+
+
     @PostMapping("/employees")
     public AdminEmployeeDto createEmployee(@Valid @RequestBody AdminUpsertEmployeeDto dto) {
         return adminService.createEmployee(dto);

@@ -29,6 +29,30 @@ public class AdminService {
     private final UserRepository userRepository;
     private final TimesheetWeekRepository timesheetWeekRepository;
     private final LeaveRequestRepository leaveRequestRepository;
+    private final TimesheetEntryRepository timesheetEntryRepository;
+
+    @Transactional
+    @CacheEvict(value = {"timesheetWeeks", "timesheetIssues", "overtimeAllocations", "doubleTimeAllocations"}, allEntries = true)
+    public AdminJobDto correctJobNumber(Long jobId, CorrectJobNumberDto dto, String actor) {
+        Job job = jobRepository.findById(jobId)
+                .orElseThrow(() -> new EntityNotFoundException("Job not found"));
+        String code = dto.code().trim();
+        if (code.equals(job.getCode())) return mapJob(job);
+        if ("226511".equals(job.getCode()) || "226511".equals(code))
+            throw new IllegalArgumentException("The Stat Holiday job number cannot be changed or reused.");
+        if (timesheetEntryRepository.hasLockedPayrollJob(jobId))
+            throw new IllegalStateException("This job is used in locked payroll. Its number cannot be corrected here.");
+        jobRepository.findByCodeIgnoreCase(code).ifPresent(existing -> {
+            if (!existing.getId().equals(jobId)) throw new IllegalArgumentException("That job number already exists. Select a different number.");
+        });
+        String previous = job.getCode();
+        job.setCode(code);
+        Job saved = jobRepository.save(job);
+        org.slf4j.LoggerFactory.getLogger(AdminService.class).info(
+                "Job number corrected: jobId={}, old={}, new={}, admin={}, reason={}",
+                jobId, previous, code, actor, dto.reason().trim());
+        return mapJob(saved);
+    }
 
     @Transactional(readOnly = true)
     public AdminDashboardDto getDashboardSummary() {
