@@ -50,7 +50,7 @@ public class AdminService {
         Job saved = jobRepository.save(job);
         org.slf4j.LoggerFactory.getLogger(AdminService.class).info(
                 "Job number corrected: jobId={}, old={}, new={}, admin={}, reason={}",
-                jobId, previous, code, actor, dto.reason().trim());
+                jobId, previous, code, actor, dto.reason() == null ? "" : dto.reason().trim());
         return mapJob(saved);
     }
 
@@ -227,6 +227,11 @@ public class AdminService {
         Role role = Role.valueOf(dto.getRole().toUpperCase());
         user.setRole(role);
         user.setActive(dto.getActive());
+        if (dto.getPremiumPayEnabled() != null) {
+            user.setPremiumPayEnabled(dto.getPremiumPayEnabled());
+            user.setPremiumPayLabel(dto.getPremiumPayLabel() == null ? null : dto.getPremiumPayLabel().trim());
+            user.setPremiumPayRate(dto.getPremiumPayRate());
+        }
 
         user.setEmployee(dto.getEmployeeId() != null
                 ? employeeRepository.findById(dto.getEmployeeId())
@@ -302,6 +307,9 @@ public class AdminService {
                 .id(user.getId())
                 .username(user.getUsername())
                 .password(user.getPasswordHash())
+                .premiumPayEnabled(Boolean.TRUE.equals(user.getPremiumPayEnabled()))
+                .premiumPayLabel(user.getPremiumPayLabel())
+                .premiumPayRate(user.getPremiumPayRate())
                 .name(user.getName())
                 .title(user.getTitle())
                 .role(user.getRole().name())

@@ -26,4 +26,11 @@ public class AdminUpsertUserDto {
 
     private Long employeeId;
     private Long supervisorId;
+
+    private Boolean premiumPayEnabled;
+    @jakarta.validation.constraints.Size(max = 120)
+    private String premiumPayLabel;
+    @jakarta.validation.constraints.DecimalMin("0.00")
+    @jakarta.validation.constraints.Digits(integer = 8, fraction = 2)
+    private java.math.BigDecimal premiumPayRate;
 }

@@ -15,4 +15,7 @@ public class AdminUserDto {
     private Boolean active;
     private Long employeeId;
     private Long supervisorId;
+    private Boolean premiumPayEnabled;
+    private String premiumPayLabel;
+    private java.math.BigDecimal premiumPayRate;
 }

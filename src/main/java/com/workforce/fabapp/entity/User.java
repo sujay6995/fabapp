@@ -36,6 +36,15 @@ public class User {
     @Column(nullable = false)
     private Boolean active;
 
+    @Column(name = "premium_pay_enabled")
+    private Boolean premiumPayEnabled;
+
+    @Column(name = "premium_pay_label", length = 120)
+    private String premiumPayLabel;
+
+    @Column(name = "premium_pay_rate", precision = 10, scale = 2)
+    private java.math.BigDecimal premiumPayRate;
+
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "employee_id")
     private Employee employee;
