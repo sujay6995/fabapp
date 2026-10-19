@@ -36,6 +36,7 @@ public class HistorySummaryController {
     }
 
     @GetMapping("/job/{jobId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPERVISOR')")
     public JobHistoryDto getJobHistory(@PathVariable Long jobId) {
         return historySummaryService.getJobHistory(jobId);
     }
