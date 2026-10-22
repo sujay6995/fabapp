@@ -347,7 +347,8 @@ public class PayrollExportService {
     }
 
     private boolean isStatPayEntry(TimesheetEntry entry) {
-        return "226511".equals(resolveJobInfo(entry).jobNumber().trim());
+        String code = resolveJobInfo(entry).jobNumber().trim();
+        return "226511".equals(code) || "227511".equals(code);
     }
 
     /*
