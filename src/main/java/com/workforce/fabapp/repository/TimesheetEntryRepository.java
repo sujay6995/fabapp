@@ -11,6 +11,8 @@ import java.util.Collection;
 import java.util.List;
 
 public interface TimesheetEntryRepository extends JpaRepository<TimesheetEntry, Long> {
+    @Query("select e from TimesheetEntry e join fetch e.timesheetWeek w left join fetch e.job left join fetch e.workType left join fetch e.leaveType left join fetch e.jobRequest where w.employee.id = :employeeId and e.workDate between :start and :end order by e.workDate, e.id")
+    List<TimesheetEntry> findEmployeeReport(@Param("employeeId") Long employeeId, @Param("start") LocalDate start, @Param("end") LocalDate end);
     @Query("select count(e) > 0 from TimesheetEntry e where e.job.id = :jobId and (e.timesheetWeek.payrollLocked = true or e.timesheetWeek.status = com.workforce.fabapp.enums.TimesheetStatus.PAYROLL_LOCKED)")
     boolean hasLockedPayrollJob(@Param("jobId") Long jobId);
 

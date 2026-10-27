@@ -41,6 +41,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .requestMatchers("/api/payroll/**").hasRole("ADMIN")
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/history/job/*").hasAnyRole("SUPERVISOR", "ADMIN")
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/history/employee/*/entries").hasAnyRole("SUPERVISOR", "ADMIN")
                         .requestMatchers("/api/history/**").hasRole("ADMIN")
                         .requestMatchers("/api/system/**").hasRole("ADMIN")
                         .requestMatchers("/api/approvals/**").hasAnyRole("SUPERVISOR", "ADMIN")
